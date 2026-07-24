@@ -81,7 +81,7 @@ include __DIR__ . '/../partials/flash.php';
       <?php endforeach; ?>
       </tbody>
     </table>
-    <a href="<?= BASE_URL ?>/student/my-referrals.php" class="btn btn-sm btn-outline-primary">View All Requests</a>
+    <a href="<?= BASE_URL ?>/student/my-appointments.php?tab=referrals" class="btn btn-sm btn-outline-primary">View All Requests</a>
   </div>
 </div>
 <?php endif; ?>

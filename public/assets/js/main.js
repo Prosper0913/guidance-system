@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
  * Fetch available slots for a counselor on a date via the availability API,
  * and render them as selectable buttons inside the given container.
  */
-function loadAvailableSlots(counselorId, date, containerId, hiddenInputId) {
+function loadAvailableSlots(counselorId, date, containerId, hiddenInputId, preferredValue) {
   const container = document.getElementById(containerId);
   const hiddenInput = document.getElementById(hiddenInputId);
   if (!container) return;
@@ -49,6 +49,17 @@ function loadAvailableSlots(counselorId, date, containerId, hiddenInputId) {
         });
         container.appendChild(btn);
       });
+
+      // Auto-select the slot matching the student's preferred time, if it's still available.
+      if (preferredValue) {
+        const prefix = preferredValue.slice(0, 5); // compare HH:MM, ignore seconds
+        const match = Array.from(container.querySelectorAll('.slot-btn'))
+          .find(b => b.dataset.value.slice(0, 5) === prefix);
+        if (match) {
+          match.click();
+          match.scrollIntoView({ block: 'nearest' });
+        }
+      }
     })
     .catch(() => {
       container.innerHTML = '<span class="text-danger">Error loading slots. Please try again.</span>';

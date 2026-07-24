@@ -1,7 +1,11 @@
 <?php
 // Expects $pageTitle to be set by the including page. $user available if logged in.
 require_once __DIR__ . '/../../src/Models/Notification.php';
+require_once __DIR__ . '/../../src/Services/ReminderService.php';
 $user = AuthMiddleware::currentUser();
+if ($user) {
+    ReminderService::run($user);
+}
 $unread = $user ? Notification::unreadCount($user['id']) : 0;
 ?>
 <!DOCTYPE html>
@@ -29,17 +33,14 @@ $unread = $user ? Notification::unreadCount($user['id']) : 0;
         <?php if ($user['role'] === ROLE_STUDENT): ?>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/student/dashboard.php">Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/student/book-appointment.php">Request Appointment</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/student/my-referrals.php">My Requests</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/student/my-appointments.php">My Appointments</a></li>
         <?php elseif ($user['role'] === ROLE_COUNSELOR): ?>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/dashboard.php">Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/appointments.php">Appointments</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/referrals.php">Referrals</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/availability.php">Availability</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/special-needs.php">Special Needs</a></li>
         <?php elseif ($user['role'] === ROLE_ADMIN): ?>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/admin/dashboard.php">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/referrals.php">Referrals</a></li>
+          <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/appointments.php?tab=referrals">Referrals</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/admin/manage-users.php">Users</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/admin/reports.php">Reports</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/admin/audit-logs.php">Audit Logs</a></li>
@@ -62,7 +63,6 @@ $unread = $user ? Notification::unreadCount($user['id']) : 0;
   <div class="container-fluid">
     <span class="navbar-brand"><img src="assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 50px;"> <?= APP_NAME ?></span>
     <ul class="navbar-nav ms-auto">
-      <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/referral-form.php">Refer a Student</a></li>
       <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/login.php">Login</a></li>
     </ul>
   </div>

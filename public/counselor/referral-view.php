@@ -115,7 +115,7 @@ include __DIR__ . '/../partials/flash.php';
           <tr><th>Student ID</th><td><?= htmlspecialchars($referral['student_id_number'] ?? '—') ?></td></tr>
           <tr><th>Grade/Year Level</th><td><?= htmlspecialchars($referral['grade_year_level'] ?? '—') ?></td></tr>
           <tr><th>Section/Course/Program</th><td><?= htmlspecialchars($referral['section_course_program'] ?? '—') ?></td></tr>
-          <tr><th>Sex</th><td><?= htmlspecialchars($referral['sex'] ?? '—') ?></td></tr>
+          <tr><th>Sex</th><td><?= $referral['sex'] ? htmlspecialchars(ucfirst($referral['sex'])) : '—' ?></td></tr>
           <tr><th>Contact</th><td><?= htmlspecialchars($referral['student_contact'] ?? '—') ?></td></tr>
           <tr><th>System Account</th><td>
             <?php if ($referral['student_id']): ?>
@@ -155,10 +155,14 @@ include __DIR__ . '/../partials/flash.php';
     </div>
 
     <?php if ($referral['preferred_type'] || $referral['preferred_counselor_id'] || $referral['preferred_date']): ?>
+    <?php $conflictCount = Referral::countConflictingPreferences((int)$referral['id'], $referral['preferred_date'] ?? null, $referral['preferred_time'] ?? null); ?>
     <div class="card mb-4">
       <div class="card-header">Student's Preferences</div>
       <div class="card-body">
         <p class="text-muted small mb-2">Submitted by the student as a soft preference — not a confirmed booking.</p>
+        <?php if ($conflictCount > 0): ?>
+          <div class="alert alert-warning py-2 small">⚠ <?= $conflictCount ?> other student<?= $conflictCount > 1 ? 's' : '' ?> also prefer<?= $conflictCount > 1 ? '' : 's' ?> this exact date/time. Only one appointment can be scheduled for that slot — the rest will need an alternate time.</div>
+        <?php endif; ?>
         <table class="table table-sm mb-0">
           <?php if ($referral['preferred_type']): ?>
             <tr><th style="width:40%">Preferred Method</th><td><?= ucfirst($referral['preferred_type']) ?></td></tr>
@@ -168,6 +172,9 @@ include __DIR__ . '/../partials/flash.php';
           <?php endif; ?>
           <?php if ($referral['preferred_date']): ?>
             <tr><th>Preferred Date</th><td><?= htmlspecialchars($referral['preferred_date']) ?></td></tr>
+          <?php endif; ?>
+          <?php if ($referral['preferred_time']): ?>
+            <tr><th>Preferred Time</th><td><?= htmlspecialchars(date('g:i A', strtotime($referral['preferred_time']))) ?></td></tr>
           <?php endif; ?>
         </table>
       </div>
@@ -303,12 +310,13 @@ include __DIR__ . '/../partials/flash.php';
       </div>
       <script>
         window.BASE_URL = '<?= BASE_URL ?>';
+        const preferredTime = <?= json_encode($referral['preferred_time'] ?? null) ?>;
         const refDateInput = document.getElementById('refDate');
         refDateInput.addEventListener('change', function () {
-          loadAvailableSlots(<?= (int)$referral['assigned_counselor_id'] ?>, this.value, 'refSlots', 'refTime');
+          loadAvailableSlots(<?= (int)$referral['assigned_counselor_id'] ?>, this.value, 'refSlots', 'refTime', preferredTime);
         });
         if (refDateInput.value) {
-          loadAvailableSlots(<?= (int)$referral['assigned_counselor_id'] ?>, refDateInput.value, 'refSlots', 'refTime');
+          loadAvailableSlots(<?= (int)$referral['assigned_counselor_id'] ?>, refDateInput.value, 'refSlots', 'refTime', preferredTime);
         }
         function validateScheduleForm() {
           const time = document.getElementById('refTime').value;

@@ -59,9 +59,6 @@ include __DIR__ . '/partials/header.php';
     <p class="text-center mt-3 mb-0">
       New student? <a href="<?= BASE_URL ?>/register.php">Create an account</a>
     </p>
-    <!--<p class="text-center mt-2 mb-0 small text-muted">
-      Faculty/Staff referring a student? <a href="<?= BASE_URL ?>/referral-form.php">Submit a Referral</a> — no account needed.
-    </p>-->
   </div>
 </div>
 <?php include __DIR__ . '/partials/footer.php'; ?>

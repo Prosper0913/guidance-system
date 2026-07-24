@@ -98,7 +98,16 @@ class ReferralService
             Referral::linkAppointment((int)$referral['id'], $appointmentId);
 
             $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
 
+        // Everything below runs only after the appointment was successfully committed.
+        // Failures here (e.g. a notification insert or a Google API hiccup) must not be
+        // treated as a failure to schedule the appointment itself, so they're isolated
+        // from the transaction above and simply logged if something goes wrong.
+        try {
             Notification::create(
                 (int)$referral['student_id'],
                 "A guidance appointment was scheduled for you on {$date} at " . date('g:i A', strtotime($time)) . ' following a referral.',
@@ -114,10 +123,28 @@ class ReferralService
             ];
             GoogleSyncService::pushCreate($fullAppointment);
 
-            return $appointmentId;
+            // Other students who preferred this exact same date/time in their own referral
+            // couldn't get it — let them know so they're not left guessing. Their referral
+            // itself is untouched; the Guidance Office still needs to pick another slot for them.
+            $siblings = $db->prepare(
+                "SELECT id, student_id, referral_no FROM referrals
+                 WHERE id != ? AND appointment_id IS NULL AND student_id IS NOT NULL
+                   AND preferred_date = ? AND preferred_time = ?"
+            );
+            $siblings->execute([(int)$referral['id'], $date, $time]);
+            foreach ($siblings->fetchAll() as $sibling) {
+                Notification::create(
+                    (int)$sibling['student_id'],
+                    "Your preferred time ({$date} at " . date('g:i A', strtotime($time)) . ") was taken by another student's request. The Guidance Office will follow up with an alternate schedule for your request ({$sibling['referral_no']}).",
+                    null,
+                    'in-app',
+                    (int)$sibling['id']
+                );
+            }
         } catch (Exception $e) {
-            $db->rollBack();
-            throw $e;
+            error_log('convertToAppointment post-commit notifications failed: ' . $e->getMessage());
         }
+
+        return $appointmentId;
     }
 }

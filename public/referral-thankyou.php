@@ -17,7 +17,7 @@ include __DIR__ . '/partials/header.php';
       <h3 class="text-success"><?= htmlspecialchars($refNo) ?></h3>
       <p class="text-muted small">Please keep this number for your records.</p>
     <?php endif; ?>
-    <a href="<?= BASE_URL ?>/referral-form.php" class="btn btn-outline-primary mt-3">Submit Another Referral</a>
+    <a href="<?= BASE_URL ?>/student/book-appointment.php" class="btn btn-outline-primary mt-3">Submit Another Request</a>
   </div>
 </div>
 <?php include __DIR__ . '/partials/footer.php'; ?>

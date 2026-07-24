@@ -2,14 +2,12 @@
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../src/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../../src/Models/Appointment.php';
-require_once __DIR__ . '/../../src/Models/SpecialNeeds.php';
 require_once __DIR__ . '/../../src/Models/Referral.php';
 require_once __DIR__ . '/../../src/Helpers/Csrf.php';
 
 $user = AuthMiddleware::requireRole([ROLE_COUNSELOR]);
 $pending = Appointment::forCounselor($user['id'], STATUS_PENDING);
 $approved = Appointment::forCounselor($user['id'], STATUS_APPROVED);
-$dueCheckIns = SpecialNeeds::dueForCheckIn($user['id']);
 $myReferrals = Referral::forCounselor($user['id']);
 $pendingReferralsGlobal = Referral::countByStatus('pending');
 
@@ -20,14 +18,11 @@ include __DIR__ . '/../partials/flash.php';
 <h3 class="mb-4">Welcome, <?= htmlspecialchars($user['first_name']) ?> 👋</h3>
 
 <div class="row mb-4">
-  <div class="col-md-4 mb-3"><div class="card"><div class="card-body">
+  <div class="col-md-6 mb-3"><div class="card"><div class="card-body">
     <h6 class="text-muted">Pending Requests</h6><h2><?= count($pending) ?></h2>
   </div></div></div>
-  <div class="col-md-4 mb-3"><div class="card"><div class="card-body">
+  <div class="col-md-6 mb-3"><div class="card"><div class="card-body">
     <h6 class="text-muted">Approved / Upcoming</h6><h2><?= count($approved) ?></h2>
-  </div></div></div>
-  <div class="col-md-4 mb-3"><div class="card"><div class="card-body">
-    <h6 class="text-muted">Special-Needs Check-ins Due</h6><h2><?= count($dueCheckIns) ?></h2>
   </div></div></div>
 </div>
 
@@ -37,7 +32,7 @@ include __DIR__ . '/../partials/flash.php';
   </div></div></div>
   <div class="col-md-4 mb-3"><div class="card"><div class="card-body">
     <h6 class="text-muted">Referrals Awaiting Triage (all)</h6><h2><?= $pendingReferralsGlobal ?></h2>
-    <a href="referrals.php" class="btn btn-sm btn-outline-primary mt-2">View Referrals</a>
+    <a href="appointments.php?tab=referrals" class="btn btn-sm btn-outline-primary mt-2">View Referrals</a>
   </div></div></div>
 </div>
 
@@ -74,19 +69,6 @@ include __DIR__ . '/../partials/flash.php';
     <?php endif; ?>
   </div>
 </div>
-
-<?php if ($dueCheckIns): ?>
-<div class="card">
-  <div class="card-header">Special-Needs Students Due for Check-in</div>
-  <div class="card-body">
-    <ul class="list-group list-group-flush">
-      <?php foreach ($dueCheckIns as $s): ?>
-        <li class="list-group-item"><?= htmlspecialchars($s['first_name'] . ' ' . $s['last_name']) ?> — <?= htmlspecialchars($s['condition_type']) ?> (next check-in was <?= htmlspecialchars($s['next_check_in']) ?>)</li>
-      <?php endforeach; ?>
-    </ul>
-  </div>
-</div>
-<?php endif; ?>
 
 <script>
 window.BASE_URL = '<?= BASE_URL ?>';

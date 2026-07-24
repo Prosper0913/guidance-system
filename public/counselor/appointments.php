@@ -2,66 +2,142 @@
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../src/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../../src/Models/Appointment.php';
+require_once __DIR__ . '/../../src/Models/Referral.php';
 require_once __DIR__ . '/../../src/Helpers/Csrf.php';
 
-$user = AuthMiddleware::requireRole([ROLE_COUNSELOR]);
-$filter = $_GET['status'] ?? '';
-$appointments = Appointment::forCounselor($user['id'], $filter ?: null);
+$user = AuthMiddleware::requireRole([ROLE_COUNSELOR, ROLE_ADMIN]);
 
-$pageTitle = 'My Appointments';
+$tab = ($_GET['tab'] ?? 'appointments') === 'referrals' ? 'referrals' : 'appointments';
+$filter = $_GET['status'] ?? '';
+
+$appointments = [];
+if ($tab === 'appointments' && $user['role'] === ROLE_COUNSELOR) {
+    $appointments = Appointment::forCounselor($user['id'], $filter ?: null);
+}
+
+$referrals = [];
+if ($tab === 'referrals') {
+    // Counselors see everything unassigned + their own; admins see everything (simpler: both see all, since triage is shared)
+    $referrals = Referral::withConflictCounts(Referral::all($filter ?: null));
+}
+
+$statusLabels = [
+    'pending' => 'Pending Review',
+    'accepted' => 'Accepted',
+    'for_clarification' => 'For Clarification',
+    'referred_back' => 'Referred Back',
+];
+
+$pageTitle = 'Appointments & Referrals';
 include __DIR__ . '/../partials/header.php';
 include __DIR__ . '/../partials/flash.php';
 ?>
-<h3 class="mb-4">Appointments</h3>
+<h3 class="mb-4">Appointments & Referrals</h3>
 
-<div class="mb-3">
-  <a class="btn btn-sm <?= $filter === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?">All</a>
-  <?php foreach (['pending','approved','completed','declined','cancelled','no-show'] as $s): ?>
-    <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?status=<?= $s ?>"><?= ucfirst($s) ?></a>
-  <?php endforeach; ?>
-</div>
+<ul class="nav nav-tabs mb-4">
+  <li class="nav-item">
+    <a class="nav-link <?= $tab === 'appointments' ? 'active' : '' ?>" href="?tab=appointments">Appointments</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link <?= $tab === 'referrals' ? 'active' : '' ?>" href="?tab=referrals">Referrals</a>
+  </li>
+</ul>
 
-<div class="card">
-  <div class="card-body">
-    <?php if (!$appointments): ?>
-      <p class="text-muted mb-0">No appointments found.</p>
-    <?php else: ?>
-      <table class="table align-middle" id="apptTable">
-        <thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Type</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-        <?php foreach ($appointments as $a): ?>
-          <tr data-id="<?= $a['id'] ?>">
-            <td><?= htmlspecialchars($a['appointment_date']) ?></td>
-            <td><?= date('g:i A', strtotime($a['appointment_time'])) ?></td>
-            <td><?= htmlspecialchars($a['student_first'] . ' ' . $a['student_last']) ?></td>
-            <td><?= ucfirst($a['type']) ?></td>
-            <td><?= htmlspecialchars($a['category_name'] ?? '—') ?><?= $a['is_confidential'] ? ' 🔒' : '' ?></td>
-            <td>
-              <span class="badge badge-status-<?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span>
-              <?php if ($a['status'] === 'pending' && (int)$a['other_pending_count'] > 0): ?>
-                <span class="badge bg-warning text-dark ms-1" title="Other students are also pending for this exact time">⚠ +<?= (int)$a['other_pending_count'] ?> other request<?= $a['other_pending_count'] > 1 ? 's' : '' ?> for this slot</span>
-              <?php endif; ?>
-            </td>
-            <td>
-              <?php if ($a['status'] === 'pending'): ?>
-                <button class="btn btn-sm btn-success" onclick="setStatus(<?= $a['id'] ?>,'approved')">Approve</button>
-                <button class="btn btn-sm btn-danger" onclick="setStatus(<?= $a['id'] ?>,'declined')">Decline</button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="sendMessage(<?= $a['id'] ?>)">Message</button>
-              <?php elseif ($a['status'] === 'approved'): ?>
-                <button class="btn btn-sm btn-primary" onclick="setStatus(<?= $a['id'] ?>,'completed')">Mark Completed</button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="setStatus(<?= $a['id'] ?>,'no-show')">No-show</button>
-                <button class="btn btn-sm btn-outline-danger" onclick="setStatus(<?= $a['id'] ?>,'cancelled')">Cancel</button>
-              <?php else: ?>
-                <a href="session-notes.php?appointment_id=<?= $a['id'] ?>" class="btn btn-sm btn-outline-dark">Notes</a>
-              <?php endif; ?>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-    <?php endif; ?>
+<?php if ($tab === 'appointments'): ?>
+
+  <?php if ($user['role'] !== ROLE_COUNSELOR): ?>
+    <p class="text-muted">Appointments are managed per-counselor. Switch to the Referrals tab to triage incoming requests.</p>
+  <?php else: ?>
+    <div class="mb-3">
+      <a class="btn btn-sm <?= $filter === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments">All</a>
+      <?php foreach (['pending','approved','completed','declined','cancelled','no-show'] as $s): ?>
+        <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments&status=<?= $s ?>"><?= ucfirst($s) ?></a>
+      <?php endforeach; ?>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <?php if (!$appointments): ?>
+          <p class="text-muted mb-0">No appointments found.</p>
+        <?php else: ?>
+          <table class="table align-middle" id="apptTable">
+            <thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Type</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            <?php foreach ($appointments as $a): ?>
+              <tr data-id="<?= $a['id'] ?>">
+                <td><?= htmlspecialchars($a['appointment_date']) ?></td>
+                <td><?= date('g:i A', strtotime($a['appointment_time'])) ?></td>
+                <td><?= htmlspecialchars($a['student_first'] . ' ' . $a['student_last']) ?></td>
+                <td><?= ucfirst($a['type']) ?></td>
+                <td><?= htmlspecialchars($a['category_name'] ?? '—') ?><?= $a['is_confidential'] ? ' 🔒' : '' ?></td>
+                <td>
+                  <span class="badge badge-status-<?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span>
+                  <?php if ($a['status'] === 'pending' && (int)$a['other_pending_count'] > 0): ?>
+                    <span class="badge bg-warning text-dark ms-1" title="Other students are also pending for this exact time">⚠ +<?= (int)$a['other_pending_count'] ?> other request<?= $a['other_pending_count'] > 1 ? 's' : '' ?> for this slot</span>
+                  <?php endif; ?>
+                </td>
+                <td>
+                  <?php if ($a['status'] === 'pending'): ?>
+                    <button class="btn btn-sm btn-success" onclick="setStatus(<?= $a['id'] ?>,'approved')">Approve</button>
+                    <button class="btn btn-sm btn-danger" onclick="setStatus(<?= $a['id'] ?>,'declined')">Decline</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="sendMessage(<?= $a['id'] ?>)">Message</button>
+                  <?php elseif ($a['status'] === 'approved'): ?>
+                    <button class="btn btn-sm btn-primary" onclick="setStatus(<?= $a['id'] ?>,'completed')">Mark Completed</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="setStatus(<?= $a['id'] ?>,'no-show')">No-show</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="setStatus(<?= $a['id'] ?>,'cancelled')">Cancel</button>
+                  <?php else: ?>
+                    <a href="session-notes.php?appointment_id=<?= $a['id'] ?>" class="btn btn-sm btn-outline-dark">Notes</a>
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php endif; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+
+<?php else: ?>
+
+  <div class="mb-3">
+    <a class="btn btn-sm <?= $filter === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=referrals">All</a>
+    <?php foreach ($statusLabels as $key => $label): ?>
+      <a class="btn btn-sm <?= $filter === $key ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=referrals&status=<?= $key ?>"><?= $label ?></a>
+    <?php endforeach; ?>
   </div>
-</div>
+
+  <div class="card">
+    <div class="card-body">
+      <?php if (!$referrals): ?>
+        <p class="text-muted mb-0">No referrals found.</p>
+      <?php else: ?>
+        <table class="table align-middle">
+          <thead><tr><th>Ref No.</th><th>Date</th><th>Student</th><th>Referred By</th><th>Urgency</th><th>Status</th><th>Assigned</th><th></th></tr></thead>
+          <tbody>
+          <?php foreach ($referrals as $r): ?>
+            <tr class="<?= $r['urgency_level'] === 'urgent' ? 'table-danger' : '' ?>">
+              <td><?= htmlspecialchars($r['referral_no'] ?? '—') ?></td>
+              <td><?= htmlspecialchars($r['referral_date']) ?></td>
+              <td><?= htmlspecialchars($r['student_name']) ?><?= $r['student_id'] ? ' <span class="badge bg-success">Linked</span>' : ' <span class="badge bg-secondary">Unlinked</span>' ?></td>
+              <td><?= htmlspecialchars($r['referring_party_name']) ?></td>
+              <td><?= $r['urgency_level'] === 'urgent' ? '<span class="badge bg-danger">Urgent</span>' : '<span class="badge bg-secondary">Routine</span>' ?></td>
+              <td><span class="badge bg-info text-dark"><?= $statusLabels[$r['status']] ?? ucfirst($r['status']) ?></span>
+                <?php if (($r['conflicting_preference_count'] ?? 0) > 0): ?>
+                  <span class="badge bg-warning text-dark ms-1" title="Other students prefer this exact date/time">⚠ +<?= $r['conflicting_preference_count'] ?> same-slot request<?= $r['conflicting_preference_count'] > 1 ? 's' : '' ?></span>
+                <?php endif; ?>
+              </td>
+              <td><?= $r['counselor_first'] ? htmlspecialchars($r['counselor_first'] . ' ' . $r['counselor_last']) : '—' ?></td>
+              <td><a href="referral-view.php?id=<?= $r['id'] ?>" class="btn btn-sm btn-outline-dark">View</a></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      <?php endif; ?>
+    </div>
+  </div>
+
+<?php endif; ?>
 
 <script>
 window.BASE_URL = '<?= BASE_URL ?>';

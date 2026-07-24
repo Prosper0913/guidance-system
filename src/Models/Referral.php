@@ -231,6 +231,50 @@ class Referral
         return (int)$stmt->fetchColumn();
     }
 
+    // Other unscheduled referrals (no appointment linked yet) requesting the exact same
+    // preferred date/time — multiple students can prefer the same slot, but only one
+    // appointment can ultimately be scheduled for it. Used to warn staff during triage.
+    public static function countConflictingPreferences(int $referralId, ?string $preferredDate, ?string $preferredTime): int
+    {
+        if (!$preferredDate || !$preferredTime) {
+            return 0;
+        }
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT COUNT(*) FROM referrals
+             WHERE id != ? AND appointment_id IS NULL
+               AND preferred_date = ? AND preferred_time = ?"
+        );
+        $stmt->execute([$referralId, $preferredDate, $preferredTime]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    // Bulk version for list views (referral triage table) — annotates each row with a
+    // conflict count without an N+1 query per row.
+    public static function withConflictCounts(array $referrals): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->query(
+            "SELECT preferred_date, preferred_time, COUNT(*) AS cnt
+             FROM referrals
+             WHERE appointment_id IS NULL AND preferred_date IS NOT NULL AND preferred_time IS NOT NULL
+             GROUP BY preferred_date, preferred_time
+             HAVING COUNT(*) > 1"
+        );
+        $counts = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $counts[$row['preferred_date'] . '|' . $row['preferred_time']] = (int)$row['cnt'];
+        }
+        foreach ($referrals as &$r) {
+            $key = ($r['preferred_date'] ?? '') . '|' . ($r['preferred_time'] ?? '');
+            $r['conflicting_preference_count'] = ($r['preferred_date'] && $r['preferred_time'] && isset($counts[$key]))
+                ? $counts[$key] - 1
+                : 0;
+        }
+        unset($r);
+        return $referrals;
+    }
+
     // Link a referral to a registered student account (found via ID number or name search)
     public static function linkStudent(int $referralId, int $studentId): void
     {

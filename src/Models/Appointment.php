@@ -189,6 +189,34 @@ class Appointment
         }
     }
 
+    public static function forStudentTomorrow(int $studentId): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT a.*, c.first_name AS counselor_first, c.last_name AS counselor_last
+             FROM appointments a
+             JOIN users c ON c.id = a.counselor_id
+             WHERE a.student_id = ? AND a.status = 'approved'
+               AND a.appointment_date = DATE_ADD(CURDATE(), INTERVAL 1 DAY)"
+        );
+        $stmt->execute([$studentId]);
+        return $stmt->fetchAll();
+    }
+
+    public static function forCounselorToday(int $counselorId): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT a.*, s.first_name AS student_first, s.last_name AS student_last
+             FROM appointments a
+             JOIN users s ON s.id = a.student_id
+             WHERE a.counselor_id = ? AND a.status = 'approved' AND a.appointment_date = CURDATE()
+             ORDER BY a.appointment_time ASC"
+        );
+        $stmt->execute([$counselorId]);
+        return $stmt->fetchAll();
+    }
+
     // Categories dropdown
     public static function categories(): array
     {
