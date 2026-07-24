@@ -1,0 +1,196 @@
+/* =====================================================
+   Guidance Appointment System — Theme
+   Palette sampled from cm.edu.ph (school site), modernized
+   ===================================================== */
+
+:root {
+  --brand-green:        #4C8C3C;
+  --brand-green-dark:   #3B6E2E;
+  --brand-green-light:  #E9F3E6;
+  --brand-dark:         #2E353F;   /* footer / dark surfaces */
+  --brand-bg:           #F7F9F6;   /* page background, faint green-white */
+  --brand-border:       #E3E8E1;
+  --text-muted-green:   #5B6B57;
+
+  --font-heading: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+  --font-body:    'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--brand-bg);
+  font-family: var(--font-body);
+  color: #2b2f2b;
+}
+
+h1, h2, h3, h4, h5, h6, .navbar-brand {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+a { color: var(--brand-green); text-decoration: none; }
+a:hover { color: var(--brand-green-dark); }
+
+/* ===== Navbar ===== */
+.app-navbar {
+  background-color: var(--brand-green);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding-top: .6rem;
+  padding-bottom: .6rem;
+}
+
+.app-navbar .navbar-brand {
+  color: #ffffff !important;
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.app-navbar .nav-link {
+  color: rgba(255,255,255,0.92) !important;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem !important;
+  transition: background-color 0.15s ease;
+}
+
+.app-navbar .nav-link:hover {
+  background-color: rgba(255,255,255,0.14);
+}
+
+.app-navbar .nav-link.disabled {
+  color: rgba(255,255,255,0.75) !important;
+}
+
+/* ===== Cards ===== */
+.card {
+  border: 1px solid var(--brand-border);
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(46, 53, 63, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 6px 18px rgba(46, 53, 63, 0.10);
+}
+
+.card-header {
+  background-color: var(--brand-green);
+  color: #fff;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  border-radius: 14px 14px 0 0 !important;
+  border-bottom: none;
+  padding: 0.9rem 1.25rem;
+}
+
+.card-body { padding: 1.25rem; }
+
+/* Stat / summary cards on dashboards */
+.card h2 {
+  color: var(--brand-green-dark);
+  font-weight: 700;
+}
+
+/* ===== Buttons ===== */
+.btn { border-radius: 8px; font-weight: 500; }
+
+.btn-primary {
+  background-color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--brand-green-dark);
+  border-color: var(--brand-green-dark);
+}
+
+.btn-outline-dark {
+  border-color: var(--brand-dark);
+  color: var(--brand-dark);
+}
+.btn-outline-dark:hover {
+  background-color: var(--brand-dark);
+  border-color: var(--brand-dark);
+}
+
+.btn-outline-primary {
+  color: var(--brand-green-dark);
+  border-color: var(--brand-green);
+}
+.btn-outline-primary:hover {
+  background-color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* ===== Forms ===== */
+.form-control, .form-select {
+  border-radius: 8px;
+  border-color: var(--brand-border);
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--brand-green);
+  box-shadow: 0 0 0 0.2rem rgba(76, 140, 60, 0.15);
+}
+.form-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--brand-dark);
+}
+
+/* ===== Tables ===== */
+.table {
+  --bs-table-hover-bg: var(--brand-green-light);
+}
+.table thead th {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--brand-dark);
+  border-bottom: 2px solid var(--brand-border);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ===== Status badges ===== */
+.badge { font-weight: 500; border-radius: 6px; padding: 0.4em 0.7em; }
+.badge-status-pending     { background-color: #E8A93B; }
+.badge-status-approved    { background-color: var(--brand-green); }
+.badge-status-declined    { background-color: #D9534F; }
+.badge-status-completed   { background-color: #3B7DBF; }
+.badge-status-cancelled   { background-color: #8A8F87; }
+.badge-status-rescheduled { background-color: #8E6FBF; }
+.badge-status-no-show     { background-color: #6B5B4E; }
+
+/* ===== Time slot picker ===== */
+.slot-btn.selected {
+  background-color: var(--brand-green) !important;
+  color: #fff !important;
+  border-color: var(--brand-green) !important;
+}
+
+/* ===== Auth pages (login/register) ===== */
+.auth-card {
+  max-width: 420px;
+  margin: 60px auto;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.auth-card .card-header {
+  text-align: center;
+  padding: 1.5rem;
+}
+
+/* ===== Footer ===== */
+.app-footer {
+  background-color: var(--brand-dark);
+  color: rgba(255,255,255,0.75);
+  margin-top: 3rem;
+}
+.app-footer a { color: rgba(255,255,255,0.9); }
+.app-footer a:hover { color: #fff; }
+
+/* ===== Alerts ===== */
+.alert { border-radius: 10px; border: none; }
+.alert-success { background-color: var(--brand-green-light); color: var(--brand-green-dark); }

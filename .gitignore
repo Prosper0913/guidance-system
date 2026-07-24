@@ -1,0 +1,12 @@
+.env
+/vendor/
+/uploads/*
+!/uploads/.gitkeep
+*.log
+*.sql.bak
+.DS_Store
+Thumbs.db
+config/database.php
+config/google.php
+full_backup.sql
+*.sql.bak
