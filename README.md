@@ -132,3 +132,12 @@ Per the school's actual policy stated on the paper form ("No Referral, No Appoin
   attendance component
 -------------------------------------------
 REMOVE PREFFERED METHOD IN REFERRAL FORM
+
+• Calendar 
+• Notification  
+• Request summary, view edit  //
+• Guidance counselor name //
+• Remove (for clarification, referred back) //
+• Remove optional scheduling  //
+- student/book-appointment.php, the preferred time, connect to the available time slots set by the guidance counselor//
+• Himoon og minutes ag slot//

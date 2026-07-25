@@ -189,6 +189,19 @@ class Appointment
         }
     }
 
+    public static function approvedSlotTaken(int $counselorId, string $date, string $time)
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT id, student_id FROM appointments
+             WHERE counselor_id = ? AND appointment_date = ? AND appointment_time = ? AND status = 'approved'
+             LIMIT 1"
+        );
+        $stmt->execute([$counselorId, $date, $time]);
+        $row = $stmt->fetch();
+        return $row ?: false;
+    }
+
     public static function forStudentTomorrow(int $studentId): array
     {
         $db = Database::getConnection();

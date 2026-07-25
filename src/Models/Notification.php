@@ -12,12 +12,13 @@ class Notification
         $stmt->execute([$userId, $appointmentId, $referralId, $message, $channel]);
     }
 
-    public static function forUser(int $userId, int $limit = 20): array
+    public static function forUser(int $userId, int $limit = 20, int $offset = 0): array
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY sent_at DESC LIMIT ?');
+        $stmt = $db->prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY sent_at DESC LIMIT ? OFFSET ?');
         $stmt->bindValue(1, $userId, PDO::PARAM_INT);
         $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
     }

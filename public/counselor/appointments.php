@@ -125,6 +125,7 @@ include __DIR__ . '/../partials/flash.php';
               <td><span class="badge bg-info text-dark"><?= $statusLabels[$r['status']] ?? ucfirst($r['status']) ?></span>
                 <?php if (($r['conflicting_preference_count'] ?? 0) > 0): ?>
                   <span class="badge bg-warning text-dark ms-1" title="Other students prefer this exact date/time">⚠ +<?= $r['conflicting_preference_count'] ?> same-slot request<?= $r['conflicting_preference_count'] > 1 ? 's' : '' ?></span>
+                  <a href="resolve-conflict.php?date=<?= urlencode($r['preferred_date']) ?>&time=<?= urlencode($r['preferred_time']) ?>" class="btn btn-sm btn-outline-warning ms-1 py-0">Resolve</a>
                 <?php endif; ?>
               </td>
               <td><?= $r['counselor_first'] ? htmlspecialchars($r['counselor_first'] . ' ' . $r['counselor_last']) : '—' ?></td>

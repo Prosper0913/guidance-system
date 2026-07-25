@@ -66,14 +66,14 @@ include __DIR__ . '/../partials/flash.php';
       <div class="card-header">Weekly Schedule</div>
       <div class="card-body">
         <table class="table table-sm">
-          <thead><tr><th>Day</th><th>Start</th><th>End</th><th>Slot (min)</th><th></th></tr></thead>
+          <thead><tr><th>Day</th><th>Start</th><th>End</th><th>&emsp;&emsp;&emsp;Minutes per session</th><th></th></tr></thead>
           <tbody>
           <?php foreach ($weekly as $w): ?>
             <tr>
               <td><?= $days[$w['day_of_week']] ?></td>
               <td><?= date('g:i A', strtotime($w['start_time'])) ?></td>
               <td><?= date('g:i A', strtotime($w['end_time'])) ?></td>
-              <td><?= $w['slot_minutes'] ?></td>
+              <td style="text-align: center;"><?= $w['slot_minutes'] ?></td>
               <td>
                 <form method="post" class="d-inline" onsubmit="return confirm('Remove this schedule block?');">
                   <?= Csrf::field() ?>

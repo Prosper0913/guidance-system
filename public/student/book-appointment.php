@@ -112,7 +112,7 @@ $contact = $user['contact_number'] ?? $user['email'];
 
 <div class="card mb-4">
   <div class="card-body">
-    <form method="post" novalidate>
+    <form method="post" novalidate id="referralForm">
       <?= Csrf::field() ?>
 
       <h5>I. Student Information</h5>
@@ -149,8 +149,9 @@ $contact = $user['contact_number'] ?? $user['email'];
       <p class="text-muted small">Please check all that apply and specify observed concerns.</p>
       <?php $letters = ['A', 'B', 'C', 'D', 'E', 'F']; $li = 0; ?>
       <?php foreach ($categories as $key => $cat): ?>
-        <div class="border rounded p-3 mb-3">
-          <strong><?= $letters[$li++] ?>. <?= htmlspecialchars($cat['label']) ?></strong>
+        <?php $letter = $letters[$li++]; ?>
+        <div class="border rounded p-3 mb-3 concern-block" data-label="<?= htmlspecialchars($letter . '. ' . $cat['label']) ?>">
+          <strong><?= $letter ?>. <?= htmlspecialchars($cat['label']) ?></strong>
           <div class="row mt-2">
             <?php foreach ($cat['items'] as $i => $item): ?>
               <div class="col-md-6">
@@ -169,7 +170,7 @@ $contact = $user['contact_number'] ?? $user['email'];
         </div>
       <?php endforeach; ?>
 
-      <div class="border rounded p-3 mb-4">
+      <div class="border rounded p-3 mb-4 concern-block" data-label="G. Other Concern">
         <strong>G. Other Concern (please specify)</strong>
         <p class="text-muted small mb-1">e.g., health-related issues, adjustment difficulties, or concerns not listed above</p>
         <input type="text" name="other_concern" class="form-control mt-1" value="<?= htmlspecialchars($old['other_concern'] ?? '') ?>">
@@ -182,7 +183,7 @@ $contact = $user['contact_number'] ?? $user['email'];
       </div>
 
       <h5 class="mt-4">V. Actions Taken Prior to Referral</h5>
-      <div class="mb-4">
+      <div class="mb-4 concern-block" data-label="Actions Taken Prior to Referral">
         <?php foreach ($actionsOptions as $i => $action): ?>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" name="actions_taken[]" value="<?= htmlspecialchars($action) ?>" id="action_<?= $i ?>"
@@ -236,17 +237,43 @@ $contact = $user['contact_number'] ?? $user['email'];
       </div>
 
       <h5 class="mt-4">Additional Scheduling Preference <span class="text-muted small">(optional, not part of the official form)</span></h5>
-      <p class="text-muted small">This helps the Guidance Office schedule you — the final date/time will be confirmed once your request is reviewed, and may differ if your preferred slot is already taken by another student.</p>
-      <div class="row g-3 mb-4">
-        <div class="col-md-4">
-          <label class="form-label">Preferred Date</label>
-          <input type="date" name="preferred_date" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>">
+      <?php $soleCounselor = $counselors[0] ?? null; ?>
+      <?php if ($soleCounselor): ?>
+        <p class="text-muted small">Pick a date to see the Guidance Office's actual open time slots — times already booked by another student won't show up. This is still a preference, not a confirmed booking: the final schedule will be confirmed once your request is reviewed, and may change if two students end up preferring the same slot.</p>
+        <input type="hidden" name="preferred_counselor_id" value="<?= (int)$soleCounselor['id'] ?>">
+        <div class="row g-3 mb-2">
+          <div class="col-md-4">
+            <label class="form-label">Preferred Date</label>
+            <input type="date" name="preferred_date" id="prefDate" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Available Time Slots</label>
+            <div id="prefSlots" class="p-2 border rounded small">Pick a date first.</div>
+            <input type="hidden" name="preferred_time" id="prefTime" value="<?= htmlspecialchars($old['preferred_time'] ?? '') ?>">
+          </div>
         </div>
-        <div class="col-md-4">
-          <label class="form-label">Preferred Time</label>
-          <input type="time" name="preferred_time" class="form-control" value="<?= htmlspecialchars($old['preferred_time'] ?? '') ?>">
+        <script>
+          const prefDateInput = document.getElementById('prefDate');
+          prefDateInput.addEventListener('change', function () {
+            loadAvailableSlots(<?= (int)$soleCounselor['id'] ?>, this.value, 'prefSlots', 'prefTime');
+          });
+          if (prefDateInput.value) {
+            loadAvailableSlots(<?= (int)$soleCounselor['id'] ?>, prefDateInput.value, 'prefSlots', 'prefTime');
+          }
+        </script>
+      <?php else: ?>
+        <p class="text-muted small">This helps the Guidance Office schedule you — the final date/time will be confirmed once your request is reviewed.</p>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <label class="form-label">Preferred Date</label>
+            <input type="date" name="preferred_date" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Preferred Time</label>
+            <input type="time" name="preferred_time" class="form-control" value="<?= htmlspecialchars($old['preferred_time'] ?? '') ?>">
+          </div>
         </div>
-      </div>
+      <?php endif; ?>
 
       <h5 class="mt-4">VII. Consent and Acknowledgement</h5>
       <div class="mb-4">
@@ -259,8 +286,29 @@ $contact = $user['contact_number'] ?? $user['email'];
         <p class="text-muted small mt-2 mb-0">By submitting this form while logged in, you are electronically signing as the referring party in place of a handwritten signature.</p>
       </div>
 
-      <button type="submit" class="btn btn-primary w-100">Submit Referral Form</button>
+      <button type="submit" class="btn btn-primary w-100">Review & Submit</button>
     </form>
+  </div>
+</div>
+
+<!-- Review modal: shows a plain-language summary of everything entered so the student can
+     catch mistakes before this actually becomes a referral. "Edit" just closes the modal —
+     nothing in the form is cleared or resubmitted, so they can fix anything and try again. -->
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Review Your Referral Before Submitting</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="reviewSummaryBody">
+        <!-- populated by JS -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Edit</button>
+        <button type="button" class="btn btn-primary" id="confirmSubmitBtn">Confirm & Submit</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -273,6 +321,96 @@ function toggleCrisisNotice() {
   document.getElementById(id).addEventListener('change', toggleCrisisNotice);
 });
 toggleCrisisNotice();
+
+// ---- Review-before-submit ----
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function fieldValue(name) {
+  const el = document.querySelector(`[name="${name}"]`);
+  return el ? el.value.trim() : '';
+}
+
+function checkedLabel(name, fallback) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? (el.dataset.label || el.value) : fallback;
+}
+
+function buildReviewSummary() {
+  const parts = [];
+
+  // Section I
+  const sex = checkedLabel('sex', '—');
+  parts.push(`<h6 class="mt-0">I. Student Information</h6><p class="mb-3">Sex: <strong>${escapeHtml(sex.charAt(0).toUpperCase() + sex.slice(1))}</strong></p>`);
+
+  // Sections III, G, and V — all tagged with the same .concern-block pattern
+  let concernsHtml = '';
+  document.querySelectorAll('.concern-block').forEach(block => {
+    const label = block.dataset.label || '';
+    const checkboxes = block.querySelectorAll('input[type="checkbox"]');
+    const checked = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+    const othersInput = block.querySelector('input[type="text"]');
+    const others = othersInput ? othersInput.value.trim() : '';
+    if (checked.length === 0 && !others) return;
+    concernsHtml += `<div class="mb-2"><strong>${escapeHtml(label)}</strong><ul class="mb-0">`;
+    checked.forEach(v => { concernsHtml += `<li>${escapeHtml(v)}</li>`; });
+    if (others) {
+      concernsHtml += checkboxes.length > 0 ? `<li><em>Others: ${escapeHtml(others)}</em></li>` : `<li>${escapeHtml(others)}</li>`;
+    }
+    concernsHtml += '</ul></div>';
+  });
+  parts.push(`<h6>III & V. Concerns and Actions Taken</h6>${concernsHtml || '<p class="text-muted small">Nothing selected.</p>'}`);
+
+  // Section IV
+  const description = fieldValue('description_of_incident');
+  parts.push(`<h6 class="mt-3">IV. Description of Behavior / Incident</h6><p class="mb-3">${description ? escapeHtml(description).replace(/\n/g, '<br>') : '<span class="text-muted">Not provided.</span>'}</p>`);
+
+  // Section VI
+  const urgencyEl = document.querySelector('input[name="urgency_level"]:checked');
+  const urgency = urgencyEl ? urgencyEl.value : 'routine';
+  const flags = [];
+  if (document.getElementById('risk_self_harm').checked) flags.push('Risk of self-harm');
+  if (document.getElementById('risk_harm_others').checked) flags.push('Risk of harm to others');
+  if (document.getElementById('severe_emotional_distress').checked) flags.push('Severe emotional distress');
+  if (document.getElementById('crisis_situation').checked) flags.push('Feels like a crisis situation');
+  parts.push(`<h6 class="mt-3">VI. Urgency Assessment</h6><p class="mb-1">Urgency: <strong>${urgency === 'urgent' ? 'Urgent' : 'Routine'}</strong></p>` +
+    (flags.length ? `<p class="mb-3 text-danger small">⚠ ${flags.map(escapeHtml).join(', ')}</p>` : '<p class="mb-3 text-muted small">No risk flags checked.</p>'));
+
+  // Preferred schedule
+  const prefDate = fieldValue('preferred_date');
+  const prefTime = fieldValue('preferred_time');
+  if (prefDate || prefTime) {
+    let timeLabel = '';
+    if (prefTime) {
+      const [h, m] = prefTime.split(':');
+      const d = new Date(); d.setHours(parseInt(h, 10), parseInt(m, 10));
+      timeLabel = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+    parts.push(`<h6 class="mt-3">Scheduling Preference</h6><p class="mb-3">${escapeHtml(prefDate || 'Any date')}${timeLabel ? ' at ' + escapeHtml(timeLabel) : ''} <span class="text-muted small">(not a confirmed booking)</span></p>`);
+  }
+
+  return parts.join('');
+}
+
+const referralForm = document.getElementById('referralForm');
+let reviewConfirmed = false;
+
+referralForm.addEventListener('submit', function (e) {
+  if (reviewConfirmed) return; // second pass, after Confirm & Submit was clicked — let it through
+  e.preventDefault();
+  if (!referralForm.reportValidity()) return; // shows native validation prompts for required fields
+  document.getElementById('reviewSummaryBody').innerHTML = buildReviewSummary();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('reviewModal')).show();
+});
+
+document.getElementById('confirmSubmitBtn').addEventListener('click', function () {
+  reviewConfirmed = true;
+  bootstrap.Modal.getInstance(document.getElementById('reviewModal'))?.hide();
+  if (referralForm.requestSubmit) referralForm.requestSubmit(); else referralForm.submit();
+});
 </script>
 
 <div class="card">

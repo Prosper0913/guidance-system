@@ -76,8 +76,8 @@ $initialActionOptions = Referral::initialActionOptions();
 $statusLabels = [
     'pending' => 'Pending Review',
     'accepted' => 'Accepted',
-    'for_clarification' => 'For Clarification',
-    'referred_back' => 'Referred Back',
+    /*'for_clarification' => 'For Clarification',
+    'referred_back' => 'Referred Back',*/
 ];
 
 $pageTitle = 'Referral ' . ($referral['referral_no'] ?? '');
@@ -161,7 +161,10 @@ include __DIR__ . '/../partials/flash.php';
       <div class="card-body">
         <p class="text-muted small mb-2">Submitted by the student as a soft preference — not a confirmed booking.</p>
         <?php if ($conflictCount > 0): ?>
-          <div class="alert alert-warning py-2 small">⚠ <?= $conflictCount ?> other student<?= $conflictCount > 1 ? 's' : '' ?> also prefer<?= $conflictCount > 1 ? '' : 's' ?> this exact date/time. Only one appointment can be scheduled for that slot — the rest will need an alternate time.</div>
+          <div class="alert alert-warning py-2 small">
+            ⚠ <?= $conflictCount ?> other student<?= $conflictCount > 1 ? 's' : '' ?> also prefer<?= $conflictCount > 1 ? '' : 's' ?> this exact date/time. Only one appointment can be scheduled for that slot.
+            <a href="resolve-conflict.php?date=<?= urlencode($referral['preferred_date']) ?>&time=<?= urlencode($referral['preferred_time']) ?>" class="btn btn-sm btn-warning ms-2">Resolve Conflict</a>
+          </div>
         <?php endif; ?>
         <table class="table table-sm mb-0">
           <?php if ($referral['preferred_type']): ?>
@@ -261,7 +264,7 @@ include __DIR__ . '/../partials/flash.php';
           <div class="mb-3">
             <label class="form-label">Assigned Guidance Advocate</label>
             <select name="assigned_counselor_id" class="form-select">
-              <option value="">-- Unassigned --</option>
+              <option value=""> Unassigned </option>
               <?php
                 $preselect = $referral['assigned_counselor_id'] ?: $referral['preferred_counselor_id'];
               ?>

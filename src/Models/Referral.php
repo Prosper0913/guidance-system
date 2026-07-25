@@ -234,6 +234,22 @@ class Referral
     // Other unscheduled referrals (no appointment linked yet) requesting the exact same
     // preferred date/time — multiple students can prefer the same slot, but only one
     // appointment can ultimately be scheduled for it. Used to warn staff during triage.
+    // All not-yet-scheduled referrals still requesting this exact date/time — the group a
+    // counselor needs to pick a winner from when two or more students want the same slot.
+    public static function findConflictGroup(string $date, string $time): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT r.*, c.first_name AS counselor_first, c.last_name AS counselor_last
+             FROM referrals r
+             LEFT JOIN users c ON c.id = r.assigned_counselor_id
+             WHERE r.appointment_id IS NULL AND r.preferred_date = ? AND r.preferred_time = ?
+             ORDER BY CASE WHEN r.urgency_level = 'urgent' THEN 0 ELSE 1 END, r.submitted_at ASC"
+        );
+        $stmt->execute([$date, $time]);
+        return $stmt->fetchAll();
+    }
+
     public static function countConflictingPreferences(int $referralId, ?string $preferredDate, ?string $preferredTime): int
     {
         if (!$preferredDate || !$preferredTime) {
