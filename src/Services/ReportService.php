@@ -71,12 +71,4 @@ class ReportService
         return $stmt->fetchAll();
     }
 
-    public static function specialNeedsSummary(): array
-    {
-        $db = Database::getConnection();
-        $sql = "SELECT sn.condition_type, COUNT(*) AS total
-                FROM special_needs_monitoring sn
-                GROUP BY sn.condition_type ORDER BY total DESC";
-        return $db->query($sql)->fetchAll();
-    }
 }

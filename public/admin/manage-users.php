@@ -82,20 +82,43 @@ include __DIR__ . '/../partials/flash.php';
   </div>
 </div>
 
+
 <?php
-function renderUserTable($title, $rows) {
+// Added $type parameter to handle different table layouts easily
+function renderUserTable($title, $rows, $type = 'admin') {
   echo '<div class="card mb-4"><div class="card-header">' . htmlspecialchars($title) . '</div><div class="card-body">';
   if (!$rows) {
     echo '<p class="text-muted mb-0">None yet.</p>';
   } else {
-    echo '<table class="table align-middle"><thead><tr><th>Name</th><th>ID No.</th><th>Email</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+    echo '<table class="table align-middle"><thead><tr><th>Name</th><th>ID No.</th><th>Email</th>';
+    
+    // Dynamic Headers
+    if ($type === 'student') {
+      echo '<th>Course</th><th>Year Level</th><th>Section</th>';
+    } elseif ($type === 'counselor') {
+      echo '<th>Specialization</th>';
+    }
+
+    echo '<th>Status</th><th>Action</th></tr></thead><tbody>';
+    
     foreach ($rows as $u) {
       $newStatus = $u['status'] === 'active' ? 'disabled' : 'active';
       $btnClass = $u['status'] === 'active' ? 'btn-outline-danger' : 'btn-outline-success';
       $btnLabel = $u['status'] === 'active' ? 'Disable' : 'Activate';
+      
       echo '<tr><td>' . htmlspecialchars($u['first_name'] . ' ' . $u['last_name']) . '</td>';
       echo '<td>' . htmlspecialchars($u['id_number']) . '</td>';
       echo '<td>' . htmlspecialchars($u['email']) . '</td>';
+      
+      // Dynamic Data Rows
+      if ($type === 'student') {
+        echo '<td>' . htmlspecialchars($u['course'] ?? 'N/A') . '</td>';
+        echo '<td>' . htmlspecialchars($u['year_level'] ?? $u['year'] ?? 'N/A') . '</td>';
+        echo '<td>' . htmlspecialchars($u['section'] ?? 'N/A') . '</td>';
+      } elseif ($type === 'counselor') {
+        echo '<td>' . htmlspecialchars($u['specialization'] ?? 'N/A') . '</td>';
+      }
+
       echo '<td><span class="badge bg-' . ($u['status'] === 'active' ? 'success' : 'secondary') . '">' . htmlspecialchars($u['status']) . '</span></td>';
       echo '<td><form method="post" onsubmit="return confirm(\'Are you sure?\');">' . Csrf::field()
          . '<input type="hidden" name="user_id" value="' . $u['id'] . '">'
@@ -106,8 +129,10 @@ function renderUserTable($title, $rows) {
   }
   echo '</div></div>';
 }
-renderUserTable('Counselors', $counselors);
-renderUserTable('Administrators', $admins);
-renderUserTable('Students', $students);
+
+// Pass the table type string to activate the correct columns
+renderUserTable('Counselors', $counselors, 'counselor');
+renderUserTable('Administrators', $admins, 'admin');
+renderUserTable('Students', $students, 'student');
 ?>
 <?php include __DIR__ . '/../partials/footer.php'; ?>

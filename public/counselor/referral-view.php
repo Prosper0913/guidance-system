@@ -27,11 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::validate($_POST['csrf_token']
     }
 
     if (isset($_POST['process_referral'])) {
-        $initialAction = array_values(array_intersect($_POST['initial_action'] ?? [], array_keys(Referral::initialActionOptions())));
+        // Counselor is auto-assigned based on student's education level — not changeable here
+        $currentReferral = Referral::findById($id);
         Referral::process($id, [
             'status' => $_POST['status'],
-            'initial_action' => $initialAction,
-            'assigned_counselor_id' => (int)($_POST['assigned_counselor_id'] ?? 0) ?: null,
+            'assigned_counselor_id' => $currentReferral['assigned_counselor_id'],
             'office_remarks' => Validator::clean($_POST['office_remarks'] ?? ''),
         ], $user['id']);
 
@@ -57,12 +57,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::validate($_POST['csrf_token']
                     $user['id']
                 );
                 $_SESSION['flash'] = ['type' => 'success', 'message' => 'Appointment scheduled from this referral.'];
-                header('Location: referral-view.php?id=' . $id);
+                header('Location: appointments.php');
                 exit;
             } catch (RuntimeException $e) {
                 $errors[] = $e->getMessage();
             }
         }
+    }
+
+    require_once __DIR__ . '/../../src/Services/NotificationService.php';
+
+    if (isset($_POST['cancel_referral'])) {
+        $currentReferral = Referral::findById($id);
+        Referral::process($id, [
+            'status' => 'cancelled',
+            'assigned_counselor_id' => $currentReferral['assigned_counselor_id'],
+            'office_remarks' => Validator::clean($_POST['office_remarks'] ?? ''),
+        ], $user['id']);
+
+        // Notify the student that their referral was cancelled
+        $updated = Referral::findById($id);
+        NotificationService::referralCancelled($updated);
+
+        $_SESSION['flash'] = ['type' => 'success', 'message' => 'Referral cancelled. The student has been notified.'];
+        header('Location: appointments.php?tab=referrals');
+        exit;
     }
 }
 
@@ -71,8 +90,8 @@ if (!empty($_GET['search'])) {
 }
 
 $referral = Referral::findById($id); // reload fresh after any POST
-$counselors = User::allCounselors();
-$initialActionOptions = Referral::initialActionOptions();
+// Counselor is auto-determined by student education level
+//$initialActionOptions = Referral::initialActionOptions();
 $statusLabels = [
     'pending' => 'Pending Review',
     'accepted' => 'Accepted',
@@ -155,7 +174,7 @@ include __DIR__ . '/../partials/flash.php';
     </div>
 
     <?php if ($referral['preferred_type'] || $referral['preferred_counselor_id'] || $referral['preferred_date']): ?>
-    <?php $conflictCount = Referral::countConflictingPreferences((int)$referral['id'], $referral['preferred_date'] ?? null, $referral['preferred_time'] ?? null); ?>
+    <?php $conflictCount = Referral::countConflictingPreferences((int)$referral['id'], $referral['preferred_date'] ?? null, $referral['preferred_time'] ?? null, (int)($referral['assigned_counselor_id'] ?? 0) ?: null); ?>
     <div class="card mb-4">
       <div class="card-header">Student's Preferences</div>
       <div class="card-body">
@@ -171,7 +190,7 @@ include __DIR__ . '/../partials/flash.php';
             <tr><th style="width:40%">Preferred Method</th><td><?= ucfirst($referral['preferred_type']) ?></td></tr>
           <?php endif; ?>
           <?php if ($referral['preferred_counselor_id']): ?>
-            <tr><th>Preferred Counselor</th><td><?= htmlspecialchars($referral['preferred_counselor_first'] . ' ' . $referral['preferred_counselor_last']) ?></td></tr>
+            <tr><th>Assigned Counselor</th><td><?= htmlspecialchars(($referral['preferred_counselor_first'] ?? '') . ' ' . ($referral['preferred_counselor_last'] ?? '')) ?> <span class="text-muted small">(auto-assigned)</span></td></tr>
           <?php endif; ?>
           <?php if ($referral['preferred_date']): ?>
             <tr><th>Preferred Date</th><td><?= htmlspecialchars($referral['preferred_date']) ?></td></tr>
@@ -245,13 +264,23 @@ include __DIR__ . '/../partials/flash.php';
           <?= Csrf::field() ?>
           <div class="mb-3">
             <label class="form-label">Referral Status</label>
-            <select name="status" class="form-select">
-              <?php foreach ($statusLabels as $key => $label): ?>
-                <option value="<?= $key ?>" <?= $referral['status'] === $key ? 'selected' : '' ?>><?= $label ?></option>
-              <?php endforeach; ?>
-            </select>
+            <?php if ($referral['status'] === 'accepted'): ?>
+              <input type="text" class="form-control" readonly value="Accepted">
+              <input type="hidden" name="status" value="accepted">
+              <div class="form-text">This referral has been accepted and can no longer be reverted to pending.</div>
+            <?php elseif ($referral['status'] === 'cancelled'): ?>
+              <input type="text" class="form-control" readonly value="Cancelled">
+              <input type="hidden" name="status" value="cancelled">
+              <div class="form-text">This referral has been cancelled and can't be reopened, accepted, or scheduled. The student was notified.</div>
+            <?php else: ?>
+              <select name="status" class="form-select">
+                <?php foreach ($statusLabels as $key => $label): ?>
+                  <option value="<?= $key ?>" <?= $referral['status'] === $key ? 'selected' : '' ?>><?= $label ?></option>
+                <?php endforeach; ?>
+              </select>
+            <?php endif; ?>
           </div>
-          <div class="mb-3">
+          <!-- <div class="mb-3"> 
             <label class="form-label">Initial Action</label>
             <?php foreach ($initialActionOptions as $key => $label): ?>
               <div class="form-check">
@@ -260,27 +289,27 @@ include __DIR__ . '/../partials/flash.php';
                 <label class="form-check-label small" for="ia_<?= $key ?>"><?= htmlspecialchars($label) ?></label>
               </div>
             <?php endforeach; ?>
-          </div>
+          </div>-->
           <div class="mb-3">
             <label class="form-label">Assigned Guidance Advocate</label>
-            <select name="assigned_counselor_id" class="form-select">
-              <option value=""> Unassigned </option>
-              <?php
-                $preselect = $referral['assigned_counselor_id'] ?: $referral['preferred_counselor_id'];
-              ?>
-              <?php foreach ($counselors as $c): ?>
-                <option value="<?= $c['id'] ?>" <?= (int)$preselect === (int)$c['id'] ? 'selected' : '' ?>>
-                  <?= htmlspecialchars($c['first_name'] . ' ' . $c['last_name']) ?>
-                  <?= (!$referral['assigned_counselor_id'] && (int)$referral['preferred_counselor_id'] === (int)$c['id']) ? ' (student preference)' : '' ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
+            <?php if ($referral['assigned_counselor_id']): ?>
+              <input type="text" class="form-control" readonly
+                value="<?= htmlspecialchars(($referral['counselor_first'] ?? '') . ' ' . ($referral['counselor_last'] ?? '')) ?>">
+              <div class="form-text">Auto-assigned based on student's education level.</div>
+            <?php else: ?>
+              <input type="text" class="form-control" readonly value="Unassigned">
+            <?php endif; ?>
           </div>
           <div class="mb-3">
             <label class="form-label">Remarks / Notes</label>
             <textarea name="office_remarks" class="form-control" rows="3"><?= htmlspecialchars($referral['office_remarks'] ?? '') ?></textarea>
           </div>
-          <button type="submit" name="process_referral" class="btn btn-primary w-100">Save</button>
+          <div class="d-flex gap-2">
+            <button type="submit" name="process_referral" class="btn btn-primary flex-fill">Save</button>
+            <?php if ($referral['status'] === 'pending'): ?>
+              <button type="submit" name="cancel_referral" class="btn btn-outline-danger" onclick="return confirm('Cancel this referral? This action cannot be undone.')">Cancel Referral</button>
+            <?php endif; ?>
+          </div>
         </form>
       </div>
     </div>
@@ -292,44 +321,33 @@ include __DIR__ . '/../partials/flash.php';
           <p class="mb-0">An appointment has already been scheduled from this referral (Appointment #<?= $referral['appointment_id'] ?>).</p>
         </div>
       </div>
-    <?php elseif ($referral['student_id'] && $referral['assigned_counselor_id']): ?>
+    <?php elseif ($referral['status'] === 'cancelled'): ?>
+      <div class="card mb-4">
+        <div class="card-body text-muted small">
+          This referral was cancelled and can no longer be scheduled. The student has been notified and can submit a new referral, or pick a new time using the same details, from their My Requests page.
+        </div>
+      </div>
+    <?php elseif ($referral['student_id'] && $referral['assigned_counselor_id'] && $referral['status'] === 'accepted'): ?>
       <div class="card mb-4">
         <div class="card-header">Schedule Appointment from Referral</div>
         <div class="card-body">
-          <form method="post" id="scheduleForm" onsubmit="return validateScheduleForm();">
-            <?= Csrf::field() ?>
-            <div class="mb-2">
-              <label class="form-label">Date</label>
-              <input type="date" name="appointment_date" id="refDate" class="form-control" required min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($referral['preferred_date'] ?? '') ?>">
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Available Time Slots</label>
-              <div id="refSlots" class="p-2 border rounded small">Select a date first.</div>
-              <input type="hidden" name="appointment_time" id="refTime">
-            </div>
-            <button type="submit" name="schedule_appointment" class="btn btn-primary btn-sm w-100">Schedule Appointment</button>
-          </form>
+          <?php if ($referral['preferred_date'] && $referral['preferred_time']): ?>
+            <p class="text-muted small mb-3">This is the date and time the student requested when submitting the referral. It is fixed and cannot be changed here.</p>
+            <table class="table table-sm mb-3">
+              <tr><th style="width:40%">Date</th><td><?= htmlspecialchars(date('F j, Y (l)', strtotime($referral['preferred_date']))) ?></td></tr>
+              <tr><th>Time</th><td><?= htmlspecialchars(date('g:i A', strtotime($referral['preferred_time']))) ?></td></tr>
+            </table>
+            <form method="post" id="scheduleForm">
+              <?= Csrf::field() ?>
+              <input type="hidden" name="appointment_date" value="<?= htmlspecialchars($referral['preferred_date']) ?>">
+              <input type="hidden" name="appointment_time" value="<?= htmlspecialchars($referral['preferred_time']) ?>">
+              <button type="submit" name="schedule_appointment" class="btn btn-primary btn-sm w-100">Confirm &amp; Schedule Appointment</button>
+            </form>
+          <?php else: ?>
+            <p class="text-muted small mb-0">The student did not specify a preferred date and time in their referral, so an appointment can't be scheduled from this page. Please coordinate a schedule with the student directly.</p>
+          <?php endif; ?>
         </div>
       </div>
-      <script>
-        window.BASE_URL = '<?= BASE_URL ?>';
-        const preferredTime = <?= json_encode($referral['preferred_time'] ?? null) ?>;
-        const refDateInput = document.getElementById('refDate');
-        refDateInput.addEventListener('change', function () {
-          loadAvailableSlots(<?= (int)$referral['assigned_counselor_id'] ?>, this.value, 'refSlots', 'refTime', preferredTime);
-        });
-        if (refDateInput.value) {
-          loadAvailableSlots(<?= (int)$referral['assigned_counselor_id'] ?>, refDateInput.value, 'refSlots', 'refTime', preferredTime);
-        }
-        function validateScheduleForm() {
-          const time = document.getElementById('refTime').value;
-          if (!time) {
-            alert('Please select a time slot first.');
-            return false;
-          }
-          return true;
-        }
-      </script>
     <?php else: ?>
       <div class="card mb-4">
         <div class="card-body text-muted small">

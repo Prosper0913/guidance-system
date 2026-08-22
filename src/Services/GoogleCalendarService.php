@@ -133,6 +133,57 @@ class GoogleCalendarService
         return $intervals;
     }
 
+    // ===== Events (pull, for the dashboard mini-calendar) =====
+
+    /**
+     * Returns actual events (with titles) between two RFC3339 timestamps — used to render
+     * the dashboard's calendar widget, as opposed to getBusyIntervals() which only returns
+     * anonymous busy blocks for the booking-availability check.
+     */
+    public static function listEvents(int $counselorId, string $timeMinISO, string $timeMaxISO): array
+    {
+        $accessToken = self::ensureValidToken($counselorId);
+        if (!$accessToken) return [];
+
+        $token = GoogleToken::get($counselorId);
+        $calendarId = $token['google_calendar_id'] ?? 'primary';
+
+        $params = http_build_query([
+            'timeMin' => $timeMinISO,
+            'timeMax' => $timeMaxISO,
+            'singleEvents' => 'true',
+            'orderBy' => 'startTime',
+            'maxResults' => 100,
+        ]);
+
+        $res = self::httpRequest(
+            'GET',
+            "https://www.googleapis.com/calendar/v3/calendars/{$calendarId}/events?{$params}",
+            null,
+            $accessToken
+        );
+        if (!$res['ok']) {
+            error_log('Google listEvents failed for counselor ' . $counselorId . ': ' . json_encode($res));
+            return [];
+        }
+
+        $events = [];
+        foreach (($res['data']['items'] ?? []) as $item) {
+            if (($item['status'] ?? '') === 'cancelled') continue;
+            $isAllDay = isset($item['start']['date']);
+            $events[] = [
+                'id' => $item['id'],
+                'title' => $item['summary'] ?? '(No title)',
+                'start' => $isAllDay ? $item['start']['date'] : $item['start']['dateTime'],
+                'end' => $isAllDay ? ($item['end']['date'] ?? null) : ($item['end']['dateTime'] ?? null),
+                'all_day' => $isAllDay,
+                'location' => $item['location'] ?? null,
+                'html_link' => $item['htmlLink'] ?? null,
+            ];
+        }
+        return $events;
+    }
+
     // ===== Events (push) =====
 
     public static function createEvent(int $counselorId, array $eventData): ?string

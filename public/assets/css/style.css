@@ -22,6 +22,14 @@ body {
   background-color: var(--brand-bg);
   font-family: var(--font-body);
   color: #2b2f2b;
+  zoom: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+main {
+  flex-grow: 1; /* Automatically expands to push the footer down */
 }
 
 h1, h2, h3, h4, h5, h6, .navbar-brand {
@@ -194,3 +202,36 @@ a:hover { color: var(--brand-green-dark); }
 /* ===== Alerts ===== */
 .alert { border-radius: 10px; border: none; }
 .alert-success { background-color: var(--brand-green-light); color: var(--brand-green-dark); }
+
+/* ===== Notifications sidebar ===== */
+.notif-item { background-color: #fff; border-color: #e9ecef !important; transition: background-color .15s ease; }
+.notif-item:hover { background-color: #f8f9fa; }
+.notif-item.notif-unread { background-color: #eef6f1; border-color: var(--brand-green-light) !important; }
+.notif-item.notif-important { border-left: 4px solid #dc3545 !important; }
+#notificationsSidebar { width: 450px; max-width: 90vw; height: 75%; border-radius: 20px; margin: 25px; }
+
+/* ===== Google Calendar mini-widget ===== */
+.gcal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.gcal-weekdays { margin-bottom: 4px; }
+.gcal-weekday { text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--text-muted-green); text-transform: uppercase; }
+.gcal-day {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background-color: #fff;
+  border: 1px solid var(--brand-border);
+  transition: background-color .15s ease;
+}
+.gcal-day:hover { background-color: var(--brand-green-light); }
+.gcal-day.gcal-blank { visibility: hidden; cursor: default; }
+.gcal-day.gcal-today { border-color: var(--brand-green); font-weight: 700; }
+.gcal-day.gcal-selected { background-color: var(--brand-green); color: #fff; }
+.gcal-day.gcal-selected:hover { background-color: var(--brand-green-dark); }
+.gcal-dot { position: absolute; bottom: 4px; width: 5px; height: 5px; border-radius: 50%; background-color: var(--brand-green); }
+.gcal-day.gcal-selected .gcal-dot { background-color: #fff; }
+.gcal-agenda-item { background-color: #fff; }

@@ -63,7 +63,7 @@ include __DIR__ . '/../partials/flash.php';
 <div class="row">
   <div class="col-md-6 mb-4">
     <div class="card">
-      <div class="card-header">Weekly Schedule</div>
+      <div class="card-header">Weekly Schedule <small class="text-muted fw-normal">(12:00–1:00 PM lunch break is automatically excluded)</small></div>
       <div class="card-body">
         <table class="table table-sm">
           <thead><tr><th>Day</th><th>Start</th><th>End</th><th>&emsp;&emsp;&emsp;Minutes per session</th><th></th></tr></thead>

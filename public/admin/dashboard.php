@@ -29,10 +29,10 @@ include __DIR__ . '/../partials/flash.php';
   <div class="col-md-3 mb-3"><div class="card"><div class="card-body"><h6 class="text-muted">Pending Referrals</h6><h2><?= $pendingReferrals ?></h2></div></div></div>
   <div class="col-md-3 mb-3"><div class="card"><div class="card-body"><h6 class="text-muted">Urgent Referrals</h6><h2 class="<?= $urgentReferrals > 0 ? 'text-danger' : '' ?>"><?= $urgentReferrals ?></h2></div></div></div>
 </div>
-<div class="row mt-2">
+<!-- <div class="row mt-2"> 
   <div class="col-md-3 mb-3"><a href="../counselor/appointments.php?tab=referrals" class="btn btn-primary w-100 py-3">Referrals</a></div>
   <div class="col-md-4 mb-3"><a href="manage-users.php" class="btn btn-primary w-100 py-3">Manage Users</a></div>
   <div class="col-md-4 mb-3"><a href="reports.php" class="btn btn-primary w-100 py-3">View Reports</a></div>
   <div class="col-md-4 mb-3"><a href="audit-logs.php" class="btn btn-primary w-100 py-3">Audit Logs</a></div>
-</div>
+</div>-->
 <?php include __DIR__ . '/../partials/footer.php'; ?>

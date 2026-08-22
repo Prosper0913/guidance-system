@@ -134,10 +134,17 @@ Per the school's actual policy stated on the paper form ("No Referral, No Appoin
 REMOVE PREFFERED METHOD IN REFERRAL FORM
 
 • Calendar 
-• Notification  
+• Notification  //
 • Request summary, view edit  //
 • Guidance counselor name //
 • Remove (for clarification, referred back) //
 • Remove optional scheduling  //
-- student/book-appointment.php, the preferred time, connect to the available time slots set by the guidance counselor//
+• student/book-appointment.php, the preferred time, connect to the available time slots set by the guidance counselor//
 • Himoon og minutes ag slot//
+•in public/counselor/referral-view.php, inside guidance office processing, remove initial actions. Referral status should be able to decline (stating the reason of declining in notes). Assigned Guidance advocate is not an option (should only put the counselors name since there is only one counselor in the school). Once processing is saved, it shouldnt be editable, instead before saving add a confirm save (are you sure you want to save).
+•in public/counselor/referral-view.php, the schedule appointment from referral, since the student is the one who chooses the timeslot (inside student/book-appointment.php), the counselor should not be able to choose the time, instead, the chosen time slot by student should appear on the counselor/referral-view.php.
+•IN STUDENT REFERRAL FORM, MAKE THEM CHOOSE GUIDANCE COUNSELOR. THEN IT AUTOMATICALLY SENDS THE REFERRAL TO THE SPECIFIC COUNSELOR
+•
+•
+•
+•

@@ -85,33 +85,47 @@ class Appointment
         }
     }
 
-    public static function reschedule(int $id, string $newDate, string $newTime, int $changedBy): void
+    // Counselor-initiated reschedule: moves an existing appointment to a new date/time
+    // without resetting its status (an approved appointment stays approved — the counselor
+    // is the one making the change, so it doesn't need re-approval). Returns the appointment
+    // row (with the new date/time already applied) so the caller can notify the student and
+    // push the update to Google Calendar without a second lookup.
+    public static function reschedule(int $id, string $newDate, string $newTime, int $changedBy, ?string $remarks = null): array
     {
         $db = Database::getConnection();
         $db->beginTransaction();
         try {
-            // Lock target slot check
-            $check = $db->prepare(
-                "SELECT id FROM appointments WHERE counselor_id = (SELECT counselor_id FROM appointments WHERE id = ?)
-                 AND appointment_date = ? AND appointment_time = ? AND status IN ('pending','approved') FOR UPDATE"
-            );
-            $check->execute([$id, $newDate, $newTime]);
-            if ($check->fetch()) {
-                throw new RuntimeException('Selected slot is no longer available.');
+            $stmt = $db->prepare('SELECT * FROM appointments WHERE id = ? FOR UPDATE');
+            $stmt->execute([$id]);
+            $appt = $stmt->fetch();
+            if (!$appt) {
+                throw new RuntimeException('Appointment not found.');
             }
 
-            $upd = $db->prepare(
-                "UPDATE appointments SET appointment_date = ?, appointment_time = ?, status = 'pending' WHERE id = ?"
+            $check = $db->prepare(
+                "SELECT id FROM appointments WHERE counselor_id = ? AND appointment_date = ? AND appointment_time = ?
+                 AND status = 'approved' AND id != ? FOR UPDATE"
             );
+            $check->execute([$appt['counselor_id'], $newDate, $newTime, $id]);
+            if ($check->fetch()) {
+                throw new RuntimeException('That time is already booked by another approved appointment.');
+            }
+
+            $upd = $db->prepare('UPDATE appointments SET appointment_date = ?, appointment_time = ? WHERE id = ?');
             $upd->execute([$newDate, $newTime, $id]);
 
+            $note = $remarks ?: "Rescheduled from {$appt['appointment_date']} {$appt['appointment_time']} to {$newDate} {$newTime}";
             $log = $db->prepare(
-                "INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks)
-                 VALUES (?, 'rescheduled', 'pending', ?, ?)"
+                'INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks)
+                 VALUES (?, ?, ?, ?, ?)'
             );
-            $log->execute([$id, $changedBy, "Rescheduled to $newDate $newTime"]);
+            $log->execute([$id, $appt['status'], $appt['status'], $changedBy, $note]);
 
             $db->commit();
+
+            $appt['appointment_date'] = $newDate;
+            $appt['appointment_time'] = $newTime;
+            return $appt;
         } catch (Exception $e) {
             $db->rollBack();
             throw $e;

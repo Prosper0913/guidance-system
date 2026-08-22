@@ -118,6 +118,10 @@ class Availability
                 // skip past slots if date is today
                 if ($date === date('Y-m-d') && $t <= time()) continue;
                 if (self::overlapsBusy($t, $t + $step, $googleBusy)) continue;
+                // Exclude lunch break: 12:00 PM - 1:00 PM
+                $lunchStart = strtotime($date . ' 12:00:00');
+                $lunchEnd   = strtotime($date . ' 13:00:00');
+                if ($t < $lunchEnd && $t + $step > $lunchStart) continue;
                 $slots[] = $timeStr;
             }
         }

@@ -34,6 +34,7 @@ $unread = $user ? Notification::unreadCount($user['id']) : 0;
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar">
   <div class="container-fluid">
     <a class="navbar-brand" href="<?= BASE_URL ?>/<?= $user['role'] ?>/dashboard.php"> <img src="<?= BASE_URL ?>/assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 50px;"> <?= APP_NAME ?></a>
+      <div class="divider"></div>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
       <span class="navbar-toggler-icon"></span>
     </button>

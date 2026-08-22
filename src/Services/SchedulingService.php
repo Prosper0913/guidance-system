@@ -15,6 +15,12 @@ class SchedulingService
         $db = Database::getConnection();
         $db->beginTransaction();
         try {
+            // ADJUSTED: Block any booking attempt during lunch time (12:00 PM - 1:00 PM)
+            $appointmentTime = date('H:i', strtotime($data['appointment_time']));
+            if ($appointmentTime >= '12:00' && $appointmentTime < '13:00') {
+                throw new RuntimeException('Selected time falls during lunch break (12:00 PM - 1:00 PM). Please select a different time.');
+            }
+
             // Lock any existing APPROVED row for this exact slot (pending requests don't
             // block — multiple students may be pending for the same slot at once).
             $lock = $db->prepare(
@@ -29,6 +35,13 @@ class SchedulingService
 
             // Re-validate against counselor's declared availability
             $validSlots = Availability::getAvailableSlots($data['counselor_id'], $data['appointment_date']);
+
+            // ADJUSTED: Filter out 12:00 PM - 1:00 PM slots from available slots
+            $validSlots = array_values(array_filter($validSlots, function ($slot) {
+                $time = date('H:i', strtotime($slot));
+                return $time < '12:00' || $time >= '13:00';
+            }));
+
             if ($data['type'] === 'online' && !in_array($data['appointment_time'], $validSlots, true)) {
                 throw new RuntimeException('Selected time is not within counselor availability.');
             }

@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/database.php';
-
+require_once __DIR__ . '/../../public/partials/push_to_cms.php';
 class Referral
 {
     /**
@@ -85,7 +85,7 @@ class Referral
         ];
     }
 
-    public static function initialActionOptions(): array
+    /*public static function initialActionOptions(): array
     {
         return [
             'for_assessment_evaluation'    => 'For assessment/evaluation',
@@ -95,7 +95,7 @@ class Referral
             'for_case_consultation'        => 'For case consultation',
             'for_behavioral_monitoring'    => 'For behavioral monitoring/follow-up',
         ];
-    }
+    }*/
 
     public static function create(array $data): int
     {
@@ -104,6 +104,7 @@ class Referral
             'INSERT INTO referrals
              (department, referral_date, student_id, student_name, student_id_number, grade_year_level,
               section_course_program, sex, student_contact, preferred_type, preferred_counselor_id,
+              assigned_counselor_id,
               preferred_date, preferred_time, referring_party_name, referring_party_position,
               referring_party_department, referring_party_contact, concerns, description_of_incident,
               actions_taken, urgency_level, risk_self_harm, risk_harm_others, severe_emotional_distress,
@@ -111,6 +112,7 @@ class Referral
              VALUES
              (:department, :referral_date, :student_id, :student_name, :student_id_number, :grade_year_level,
               :section_course_program, :sex, :student_contact, :preferred_type, :preferred_counselor_id,
+              :assigned_counselor_id,
               :preferred_date, :preferred_time, :referring_party_name, :referring_party_position,
               :referring_party_department, :referring_party_contact, :concerns, :description_of_incident,
               :actions_taken, :urgency_level, :risk_self_harm, :risk_harm_others, :severe_emotional_distress,
@@ -128,6 +130,7 @@ class Referral
             'student_contact' => $data['student_contact'] ?? null,
             'preferred_type' => $data['preferred_type'] ?? null,
             'preferred_counselor_id' => $data['preferred_counselor_id'] ?? null,
+            'assigned_counselor_id' => $data['assigned_counselor_id'] ?? null,
             'preferred_date' => $data['preferred_date'] ?? null,
             'preferred_time' => $data['preferred_time'] ?? null,
             'referring_party_name' => $data['referring_party_name'],
@@ -151,6 +154,21 @@ class Referral
         $upd = $db->prepare('UPDATE referrals SET referral_no = ? WHERE id = ?');
         $upd->execute([$referralNo, $id]);
 
+        // ── Push referral flag to CMS ──
+        // New referral created with status='pending' (active). Push the
+        // flag so CMS knows this student has an active referral.
+        // Try student_id_number first; if empty, look up from student_id.
+        $id_number = $data['student_id_number'] ?? '';
+        if (!$id_number && !empty($data['student_id'])) {
+            $lu = $db->prepare('SELECT id_number FROM users WHERE id = ? LIMIT 1');
+            $lu->execute([$data['student_id']]);
+            $u = $lu->fetch(\PDO::FETCH_ASSOC);
+            $id_number = $u ? $u['id_number'] : '';
+        }
+        if ($id_number) {
+            push_referral_flag_to_cms($id_number);
+        }
+
         return $id;
     }
 
@@ -172,7 +190,7 @@ class Referral
         if (!$row) return null;
         $row['concerns'] = json_decode($row['concerns'], true) ?: [];
         $row['actions_taken'] = json_decode($row['actions_taken'], true) ?: [];
-        $row['initial_action'] = json_decode($row['initial_action'] ?? '[]', true) ?: [];
+        //$row['initial_action'] = json_decode($row['initial_action'] ?? '[]', true) ?: [];
         return $row;
     }
 
@@ -216,7 +234,10 @@ class Referral
     {
         $db = Database::getConnection();
         $stmt = $db->prepare(
-            "SELECT r.* FROM referrals r WHERE r.assigned_counselor_id = ?
+            "SELECT r.*, c.first_name AS counselor_first, c.last_name AS counselor_last
+             FROM referrals r
+             LEFT JOIN users c ON c.id = r.assigned_counselor_id
+             WHERE r.assigned_counselor_id = ?
              ORDER BY CASE WHEN r.urgency_level = 'urgent' THEN 0 ELSE 1 END, r.submitted_at DESC"
         );
         $stmt->execute([$counselorId]);
@@ -243,47 +264,65 @@ class Referral
             "SELECT r.*, c.first_name AS counselor_first, c.last_name AS counselor_last
              FROM referrals r
              LEFT JOIN users c ON c.id = r.assigned_counselor_id
-             WHERE r.appointment_id IS NULL AND r.preferred_date = ? AND r.preferred_time = ?
+             WHERE r.appointment_id IS NULL AND r.status != 'cancelled'
+               AND r.preferred_date = ? AND r.preferred_time = ?
              ORDER BY CASE WHEN r.urgency_level = 'urgent' THEN 0 ELSE 1 END, r.submitted_at ASC"
         );
         $stmt->execute([$date, $time]);
         return $stmt->fetchAll();
     }
 
-    public static function countConflictingPreferences(int $referralId, ?string $preferredDate, ?string $preferredTime): int
+    public static function countConflictingPreferences(int $referralId, ?string $preferredDate, ?string $preferredTime, ?int $counselorId = null): int
     {
         if (!$preferredDate || !$preferredTime) {
             return 0;
         }
         $db = Database::getConnection();
-        $stmt = $db->prepare(
-            "SELECT COUNT(*) FROM referrals
-             WHERE id != ? AND appointment_id IS NULL
-               AND preferred_date = ? AND preferred_time = ?"
-        );
-        $stmt->execute([$referralId, $preferredDate, $preferredTime]);
+        if ($counselorId) {
+            $stmt = $db->prepare(
+                "SELECT COUNT(*) FROM referrals
+                 WHERE id != ? AND appointment_id IS NULL AND status != 'cancelled'
+                   AND preferred_date = ? AND preferred_time = ?
+                   AND assigned_counselor_id = ?"
+            );
+            $stmt->execute([$referralId, $preferredDate, $preferredTime, $counselorId]);
+        } else {
+            $stmt = $db->prepare(
+                "SELECT COUNT(*) FROM referrals
+                 WHERE id != ? AND appointment_id IS NULL AND status != 'cancelled'
+                   AND preferred_date = ? AND preferred_time = ?"
+            );
+            $stmt->execute([$referralId, $preferredDate, $preferredTime]);
+        }
         return (int)$stmt->fetchColumn();
     }
 
     // Bulk version for list views (referral triage table) — annotates each row with a
-    // conflict count without an N+1 query per row.
+    // conflict count without an N+1 query per row. Only counts conflicts within
+    // the same counselor's referrals (different counselors handle different levels).
     public static function withConflictCounts(array $referrals): array
     {
+        if (empty($referrals)) return $referrals;
         $db = Database::getConnection();
+        // Group by counselor_id + date + time so conflicts are per-counselor
         $stmt = $db->query(
-            "SELECT preferred_date, preferred_time, COUNT(*) AS cnt
+            "SELECT assigned_counselor_id, preferred_date, preferred_time, COUNT(*) AS cnt
              FROM referrals
-             WHERE appointment_id IS NULL AND preferred_date IS NOT NULL AND preferred_time IS NOT NULL
-             GROUP BY preferred_date, preferred_time
+             WHERE appointment_id IS NULL AND status != 'cancelled'
+               AND preferred_date IS NOT NULL AND preferred_time IS NOT NULL
+               AND assigned_counselor_id IS NOT NULL
+             GROUP BY assigned_counselor_id, preferred_date, preferred_time
              HAVING COUNT(*) > 1"
         );
         $counts = [];
         foreach ($stmt->fetchAll() as $row) {
-            $counts[$row['preferred_date'] . '|' . $row['preferred_time']] = (int)$row['cnt'];
+            $key = $row['assigned_counselor_id'] . '|' . $row['preferred_date'] . '|' . $row['preferred_time'];
+            $counts[$key] = (int)$row['cnt'];
         }
         foreach ($referrals as &$r) {
-            $key = ($r['preferred_date'] ?? '') . '|' . ($r['preferred_time'] ?? '');
-            $r['conflicting_preference_count'] = ($r['preferred_date'] && $r['preferred_time'] && isset($counts[$key]))
+            $cid = $r['assigned_counselor_id'] ?? '';
+            $key = $cid . '|' . ($r['preferred_date'] ?? '') . '|' . ($r['preferred_time'] ?? '');
+            $r['conflicting_preference_count'] = ($r['preferred_date'] && $r['preferred_time'] && $cid && isset($counts[$key]))
                 ? $counts[$key] - 1
                 : 0;
         }
@@ -295,8 +334,32 @@ class Referral
     public static function linkStudent(int $referralId, int $studentId): void
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare('UPDATE referrals SET student_id = ? WHERE id = ?');
-        $stmt->execute([$studentId, $referralId]);
+
+        // Fetch the previous student_id BEFORE updating, so we can
+        // re-compute their flag after (in case this was their only referral).
+        $prev = $db->prepare('SELECT student_id FROM referrals WHERE id = ?');
+        $prev->execute([$referralId]);
+        $prevRow = $prev->fetch(\PDO::FETCH_ASSOC);
+        $prevStudentId = $prevRow ? (int)$prevRow['student_id'] : 0;
+
+        // Look up the student's id_number (maps to CMS students.student_id)
+        $lu = $db->prepare('SELECT id_number FROM users WHERE id = ? LIMIT 1');
+        $lu->execute([$studentId]);
+        $u = $lu->fetch(\PDO::FETCH_ASSOC);
+        $idNumber = $u ? $u['id_number'] : null;
+
+        // Update the link AND sync student_id_number (so future
+        // push_referral_flag_to_cms calls can find this referral)
+        $stmt = $db->prepare('UPDATE referrals SET student_id = ?, student_id_number = ? WHERE id = ?');
+        $stmt->execute([$studentId, $idNumber, $referralId]);
+
+        // Push referral flag for the new student
+        push_referral_flag_to_cms_by_user_id($studentId);
+
+        // If there was a previous different student, re-compute their flag
+        if ($prevStudentId > 0 && $prevStudentId !== $studentId) {
+            push_referral_flag_to_cms_by_user_id($prevStudentId);
+        }
     }
 
     // Section VIII — Guidance Office processing
@@ -308,7 +371,7 @@ class Referral
                 status = :status,
                 received_by = :received_by,
                 received_at = COALESCE(received_at, NOW()),
-                initial_action = :initial_action,
+                -- initial_action = :initial_action,
                 assigned_counselor_id = :assigned_counselor_id,
                 office_remarks = :office_remarks
              WHERE id = :id'
@@ -316,11 +379,30 @@ class Referral
         $stmt->execute([
             'status' => $data['status'],
             'received_by' => $processedBy,
-            'initial_action' => json_encode($data['initial_action'] ?? []),
+            //'initial_action' => json_encode($data['initial_action'] ?? []),
             'assigned_counselor_id' => $data['assigned_counselor_id'] ?: null,
             'office_remarks' => $data['office_remarks'] ?? null,
             'id' => $referralId,
         ]);
+
+        // ── Push referral flag to CMS ──
+        // The status change may have activated or deactivated the flag.
+        // Look up the student's id_number (try referrals.student_id_number
+        // first, then fall back to users.id_number via student_id).
+        $lu = $db->prepare(
+            'SELECT r.student_id_number, u.id_number AS user_id_number
+             FROM referrals r
+             LEFT JOIN users u ON u.id = r.student_id
+             WHERE r.id = ?'
+        );
+        $lu->execute([$referralId]);
+        $r = $lu->fetch(\PDO::FETCH_ASSOC);
+        if ($r) {
+            $id_number = $r['student_id_number'] ?: $r['user_id_number'];
+            if ($id_number) {
+                push_referral_flag_to_cms($id_number);
+            }
+        }
     }
 
     public static function linkAppointment(int $referralId, int $appointmentId): void

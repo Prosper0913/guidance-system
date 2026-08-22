@@ -10,7 +10,6 @@ $categoryBreakdown = ReportService::concernCategoryBreakdown();
 $attendance = ReportService::attendanceRate();
 $caseload = ReportService::counselorCaseload();
 $busiest = ReportService::busiestSlots();
-$specialNeeds = ReportService::specialNeedsSummary();
 
 $pageTitle = 'Reports';
 include __DIR__ . '/../partials/header.php';

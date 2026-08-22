@@ -128,7 +128,7 @@ class ReferralService
             // itself is untouched; the Guidance Office still needs to pick another slot for them.
             $siblings = $db->prepare(
                 "SELECT id, student_id, referral_no FROM referrals
-                 WHERE id != ? AND appointment_id IS NULL AND student_id IS NOT NULL
+                 WHERE id != ? AND appointment_id IS NULL AND status != 'cancelled' AND student_id IS NOT NULL
                    AND preferred_date = ? AND preferred_time = ?"
             );
             $siblings->execute([(int)$referral['id'], $date, $time]);

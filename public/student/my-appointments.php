@@ -32,12 +32,14 @@ $referrals = $tab === 'referrals' ? Referral::forStudent($user['id']) : [];
 $statusLabels = [
     'pending' => 'Pending Review',
     'accepted' => 'Accepted',
+    'cancelled' => 'Cancelled',
     'for_clarification' => 'For Clarification',
     'referred_back' => 'Referred Back',
 ];
 $statusBadge = [
     'pending' => 'bg-warning text-dark',
     'accepted' => 'bg-success',
+    'cancelled' => 'bg-danger',
     'for_clarification' => 'bg-info text-dark',
     'referred_back' => 'bg-secondary',
 ];
@@ -111,6 +113,11 @@ include __DIR__ . '/../partials/flash.php';
               <td>
                 <?php if ($r['appointment_id']): ?>
                   <a href="?tab=appointments" class="btn btn-sm btn-outline-primary">View in My Appointments</a>
+                <?php elseif ($r['status'] === 'cancelled'): ?>
+                  <div class="d-flex flex-column gap-1">
+                    <a href="<?= BASE_URL ?>/student/book-appointment.php?resubmit_from=<?= (int)$r['id'] ?>" class="btn btn-sm btn-primary">Pick New Time (Same Details)</a>
+                    <a href="<?= BASE_URL ?>/student/book-appointment.php" class="btn btn-sm btn-outline-secondary">Submit New Referral</a>
+                  </div>
                 <?php else: ?>
                   <span class="text-muted small">Not yet scheduled</span>
                 <?php endif; ?>

@@ -17,13 +17,19 @@ if ($tab === 'appointments' && $user['role'] === ROLE_COUNSELOR) {
 
 $referrals = [];
 if ($tab === 'referrals') {
-    // Counselors see everything unassigned + their own; admins see everything (simpler: both see all, since triage is shared)
-    $referrals = Referral::withConflictCounts(Referral::all($filter ?: null));
+    if ($user['role'] === ROLE_ADMIN) {
+        // Admins see all referrals across all levels
+        $referrals = Referral::withConflictCounts(Referral::all($filter ?: null));
+    } else {
+        // Counselors only see referrals assigned to them (auto-determined by education level)
+        $referrals = Referral::withConflictCounts(Referral::forCounselor($user['id']));
+    }
 }
 
 $statusLabels = [
     'pending' => 'Pending Review',
     'accepted' => 'Accepted',
+    'cancelled' => 'Cancelled',
     'for_clarification' => 'For Clarification',
     'referred_back' => 'Referred Back',
 ];
@@ -84,6 +90,7 @@ include __DIR__ . '/../partials/flash.php';
                   <?php elseif ($a['status'] === 'approved'): ?>
                     <button class="btn btn-sm btn-primary" onclick="setStatus(<?= $a['id'] ?>,'completed')">Mark Completed</button>
                     <button class="btn btn-sm btn-outline-secondary" onclick="setStatus(<?= $a['id'] ?>,'no-show')">No-show</button>
+                    <button class="btn btn-sm btn-outline-dark" onclick="openRescheduleModal(<?= $a['id'] ?>, '<?= htmlspecialchars($a['appointment_date']) ?>')">Reschedule</button>
                     <button class="btn btn-sm btn-outline-danger" onclick="setStatus(<?= $a['id'] ?>,'cancelled')">Cancel</button>
                   <?php else: ?>
                     <a href="session-notes.php?appointment_id=<?= $a['id'] ?>" class="btn btn-sm btn-outline-dark">Notes</a>
@@ -122,7 +129,16 @@ include __DIR__ . '/../partials/flash.php';
               <td><?= htmlspecialchars($r['student_name']) ?><?= $r['student_id'] ? ' <span class="badge bg-success">Linked</span>' : ' <span class="badge bg-secondary">Unlinked</span>' ?></td>
               <td><?= htmlspecialchars($r['referring_party_name']) ?></td>
               <td><?= $r['urgency_level'] === 'urgent' ? '<span class="badge bg-danger">Urgent</span>' : '<span class="badge bg-secondary">Routine</span>' ?></td>
-              <td><span class="badge bg-info text-dark"><?= $statusLabels[$r['status']] ?? ucfirst($r['status']) ?></span>
+              <?php
+                $badgeClass = [
+                    'pending' => 'bg-warning text-dark',
+                    'accepted' => 'bg-success',
+                    'cancelled' => 'bg-danger',
+                    'for_clarification' => 'bg-info text-dark',
+                    'referred_back' => 'bg-secondary',
+                ][$r['status']] ?? 'bg-info text-dark';
+              ?>
+              <td><span class="badge <?= $badgeClass ?>"><?= $statusLabels[$r['status']] ?? ucfirst($r['status']) ?></span>
                 <?php if (($r['conflicting_preference_count'] ?? 0) > 0): ?>
                   <span class="badge bg-warning text-dark ms-1" title="Other students prefer this exact date/time">⚠ +<?= $r['conflicting_preference_count'] ?> same-slot request<?= $r['conflicting_preference_count'] > 1 ? 's' : '' ?></span>
                   <a href="resolve-conflict.php?date=<?= urlencode($r['preferred_date']) ?>&time=<?= urlencode($r['preferred_time']) ?>" class="btn btn-sm btn-outline-warning ms-1 py-0">Resolve</a>
@@ -140,9 +156,38 @@ include __DIR__ . '/../partials/flash.php';
 
 <?php endif; ?>
 
+<!-- Reschedule modal: shared across rows, populated per-appointment when opened. -->
+<div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Reschedule Appointment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">New Date</label>
+          <input type="date" id="rescheduleDate" class="form-control" min="<?= date('Y-m-d') ?>">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Available Time Slots</label>
+          <div id="rescheduleSlots" class="p-2 border rounded small">Pick a date first.</div>
+          <input type="hidden" id="rescheduleTime">
+        </div>
+        <div id="rescheduleError" class="text-danger small"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmRescheduleBtn">Confirm New Time</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 window.BASE_URL = '<?= BASE_URL ?>';
 const CSRF = '<?= Csrf::token() ?>';
+const CURRENT_COUNSELOR_ID = <?= (int)$user['id'] ?>;
 function setStatus(id, status) {
   const remarks = (status === 'declined' || status === 'cancelled') ? (prompt('Optional reason:') || '') : '';
   const fd = new FormData();
@@ -174,6 +219,55 @@ function sendMessage(id) {
   fetch(window.BASE_URL + '/api/send-message.php', { method: 'POST', body: fd })
     .then(res => res.json())
     .then(data => { alert(data.success ? 'Message sent.' : (data.message || 'Unable to send message.')); });
+}
+
+let rescheduleTargetId = null;
+const rescheduleDateInput = document.getElementById('rescheduleDate');
+const rescheduleModalEl = document.getElementById('rescheduleModal');
+
+function openRescheduleModal(id, currentDate) {
+  rescheduleTargetId = id;
+  document.getElementById('rescheduleError').textContent = '';
+  document.getElementById('rescheduleSlots').innerHTML = 'Pick a date first.';
+  document.getElementById('rescheduleTime').value = '';
+  rescheduleDateInput.value = currentDate || '';
+  bootstrap.Modal.getOrCreateInstance(rescheduleModalEl).show();
+  if (currentDate) {
+    loadAvailableSlots(CURRENT_COUNSELOR_ID, currentDate, 'rescheduleSlots', 'rescheduleTime');
+  }
+}
+
+if (rescheduleDateInput) {
+  rescheduleDateInput.addEventListener('change', function () {
+    loadAvailableSlots(CURRENT_COUNSELOR_ID, this.value, 'rescheduleSlots', 'rescheduleTime');
+  });
+}
+
+const confirmRescheduleBtn = document.getElementById('confirmRescheduleBtn');
+if (confirmRescheduleBtn) {
+  confirmRescheduleBtn.addEventListener('click', function () {
+    const newTime = document.getElementById('rescheduleTime').value;
+    const errorEl = document.getElementById('rescheduleError');
+    if (!newTime) {
+      errorEl.textContent = 'Please select a time slot.';
+      return;
+    }
+    const fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    fd.append('appointment_id', rescheduleTargetId);
+    fd.append('new_date', rescheduleDateInput.value);
+    fd.append('new_time', newTime);
+    fetch(window.BASE_URL + '/api/reschedule-appointment.php', { method: 'POST', body: fd })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          location.reload();
+        } else {
+          errorEl.textContent = data.message || 'Unable to reschedule.';
+        }
+      })
+      .catch(() => { errorEl.textContent = 'Something went wrong. Please try again.'; });
+  });
 }
 </script>
 <?php include __DIR__ . '/../partials/footer.php'; ?>

@@ -14,11 +14,77 @@ require_once __DIR__ . '/../../src/Helpers/Validator.php';
 
 $user = AuthMiddleware::requireRole([ROLE_STUDENT]);
 $profile = User::studentProfile($user['id']);
-$counselors = User::allCounselors();
+
+// If student has no education level set (old account), prompt them before proceeding
+if (!$profile || empty($profile['education_level'])) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_education_level']) && Csrf::validate($_POST['csrf_token'] ?? null)) {
+        $level = $_POST['education_level'] ?? '';
+        if (in_array($level, ['junior_highschool', 'senior_highschool', 'college'], true)) {
+            User::saveEducationLevel((int)$user['id'], $level);
+            header('Location: ' . BASE_URL . '/student/book-appointment.php');
+            exit;
+        }
+    }
+    $pageTitle = 'Select Education Level';
+    include __DIR__ . '/../partials/header.php';
+    ?>
+    <div class="card" style="max-width:480px;margin:2rem auto;">
+      <div class="card-body p-4 text-center">
+        <p class="mb-3">Welcome, <strong><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></strong>!</p>
+        <p class="text-muted small mb-3">Please select your education level to continue. This assigns you to the correct guidance counselor.</p>
+        <form method="post" novalidate>
+          <?= Csrf::field() ?>
+          <div class="mb-3 text-start">
+            <label class="form-label">Education Level <span class="text-danger">*</span></label>
+            <select name="education_level" class="form-select" required>
+              <option value="">-- Select Level --</option>
+              <option value="junior_highschool">Junior Highschool</option>
+              <option value="senior_highschool">Senior Highschool</option>
+              <option value="college">College</option>
+            </select>
+          </div>
+          <button type="submit" name="save_education_level" class="btn btn-primary w-100">Continue</button>
+        </form>
+      </div>
+    </div>
+    <?php
+    include __DIR__ . '/../partials/footer.php';
+    exit;
+}
+
+// Auto-assign counselor based on student's education level
+$autoCounselor = User::getCounselorForStudent($user['id']);
+$counselors = $autoCounselor ? [$autoCounselor] : User::allCounselors();
 $categories = Referral::concernCategories();
 $actionsOptions = Referral::actionsTakenOptions();
 $errors = [];
 $old = [];
+
+// If picking a new time for a cancelled referral, prefill the same concerns/description/
+// urgency so the student doesn't retype everything — they just choose a new date/time.
+$resubmitFrom = null;
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !empty($_GET['resubmit_from'])) {
+    $src = Referral::findById((int)$_GET['resubmit_from']);
+    if ($src && (int)$src['student_id'] === (int)$user['id'] && $src['status'] === 'cancelled') {
+        $resubmitFrom = $src;
+        $old = [
+            'sex' => $src['sex'],
+            'description_of_incident' => $src['description_of_incident'],
+            'urgency_level' => $src['urgency_level'],
+            'risk_self_harm' => $src['risk_self_harm'],
+            'risk_harm_others' => $src['risk_harm_others'],
+            'severe_emotional_distress' => $src['severe_emotional_distress'],
+            'crisis_situation' => $src['crisis_situation'],
+            'other_concern' => $src['concerns']['other_concern'] ?? '',
+            'actions_taken' => $src['actions_taken']['items'] ?? [],
+            'actions_taken_others' => $src['actions_taken']['others'] ?? '',
+        ];
+        foreach ($categories as $key => $cat) {
+            $old['concerns'][$key] = $src['concerns'][$key] ?? [];
+            $old['concerns_others'][$key] = $src['concerns'][$key . '_others'] ?? '';
+        }
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $old = $_POST;
@@ -42,6 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!$hasAnyConcern) $errors[] = 'Please select or specify at least one concern in Section III.';
         if (empty($_POST['sex'])) $errors[] = 'Please select your sex in Section I.';
+        if (empty($_POST['preferred_date'])) $errors[] = 'Please select a preferred date.';
+        if (empty($_POST['preferred_time'])) $errors[] = 'Please select an available time slot.';
         if (empty($_POST['consent_certified'])) $errors[] = 'You must certify the information and accept the confidentiality terms in Section VII.';
 
         // Section V — actions taken prior to referral
@@ -64,6 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'student_contact' => $user['contact_number'] ?? $user['email'],
                 'preferred_type' => in_array($_POST['preferred_type'] ?? '', ['walk-in', 'online'], true) ? $_POST['preferred_type'] : null,
                 'preferred_counselor_id' => (int)($_POST['preferred_counselor_id'] ?? 0) ?: null,
+                'assigned_counselor_id' => $autoCounselor ? (int)$autoCounselor['id'] : null,
                 'preferred_date' => !empty($_POST['preferred_date']) ? $_POST['preferred_date'] : null,
                 'preferred_time' => !empty($_POST['preferred_time']) ? $_POST['preferred_time'] : null,
                 'referring_party_name' => $user['first_name'] . ' ' . $user['last_name'],
@@ -82,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             $referral = Referral::findById($referralId);
-            ReferralService::notifyNewReferral($referralId, $referral['student_name'], $referral['urgency_level'] === 'urgent');
+            ReferralService::notifyNewReferral($referralId, $referral['student_name'], $referral['urgency_level'] === 'urgent', $autoCounselor ? (int)$autoCounselor['id'] : null);
 
             header('Location: ' . BASE_URL . '/referral-thankyou.php?ref=' . urlencode($referral['referral_no']));
             exit;
@@ -109,6 +178,12 @@ $contact = $user['contact_number'] ?? $user['email'];
 </div>
 
 <?php foreach ($errors as $e): ?><div class="alert alert-danger"><?= htmlspecialchars($e) ?></div><?php endforeach; ?>
+
+<?php if ($resubmitFrom): ?>
+  <div class="alert alert-info">
+    You're picking a new time for your cancelled referral <strong><?= htmlspecialchars($resubmitFrom['referral_no']) ?></strong>. Your previous concerns and details have been carried over — review them below, then choose a new preferred date and time.
+  </div>
+<?php endif; ?>
 
 <div class="card mb-4">
   <div class="card-body">
@@ -236,20 +311,21 @@ $contact = $user['contact_number'] ?? $user['email'];
         </div>
       </div>
 
-      <h5 class="mt-4">Additional Scheduling Preference <span class="text-muted small">(optional, not part of the official form)</span></h5>
+      <h5 class="mt-4">Additional Scheduling Preference</h5>
       <?php $soleCounselor = $counselors[0] ?? null; ?>
       <?php if ($soleCounselor): ?>
         <p class="text-muted small">Pick a date to see the Guidance Office's actual open time slots — times already booked by another student won't show up. This is still a preference, not a confirmed booking: the final schedule will be confirmed once your request is reviewed, and may change if two students end up preferring the same slot.</p>
         <input type="hidden" name="preferred_counselor_id" value="<?= (int)$soleCounselor['id'] ?>">
         <div class="row g-3 mb-2">
           <div class="col-md-4">
-            <label class="form-label">Preferred Date</label>
-            <input type="date" name="preferred_date" id="prefDate" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>">
+            <label class="form-label">Preferred Date <span class="text-danger">*</span></label>
+            <input type="date" name="preferred_date" id="prefDate" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>" required>
           </div>
           <div class="col-md-8">
-            <label class="form-label">Available Time Slots</label>
+            <label class="form-label">Available Time Slots <span class="text-danger">*</span></label>
             <div id="prefSlots" class="p-2 border rounded small">Pick a date first.</div>
-            <input type="hidden" name="preferred_time" id="prefTime" value="<?= htmlspecialchars($old['preferred_time'] ?? '') ?>">
+            <input type="hidden" name="preferred_time" id="prefTime" value="<?= htmlspecialchars($old['preferred_time'] ?? '') ?>" required>
+            <div id="prefTimeError" class="text-danger small mt-1 d-none">Please select an available time slot.</div>
           </div>
         </div>
         <script>
@@ -265,12 +341,12 @@ $contact = $user['contact_number'] ?? $user['email'];
         <p class="text-muted small">This helps the Guidance Office schedule you — the final date/time will be confirmed once your request is reviewed.</p>
         <div class="row g-3 mb-4">
           <div class="col-md-4">
-            <label class="form-label">Preferred Date</label>
-            <input type="date" name="preferred_date" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>">
+            <label class="form-label">Preferred Date <span class="text-danger">*</span></label>
+            <input type="date" name="preferred_date" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>" required>
           </div>
           <div class="col-md-4">
-            <label class="form-label">Preferred Time</label>
-            <input type="time" name="preferred_time" class="form-control" value="<?= htmlspecialchars($old['preferred_time'] ?? '') ?>">
+            <label class="form-label">Preferred Time <span class="text-danger">*</span></label>
+            <input type="time" name="preferred_time" class="form-control" value="<?= htmlspecialchars($old['preferred_time'] ?? '') ?>" required>
           </div>
         </div>
       <?php endif; ?>
@@ -291,9 +367,7 @@ $contact = $user['contact_number'] ?? $user['email'];
   </div>
 </div>
 
-<!-- Review modal: shows a plain-language summary of everything entered so the student can
-     catch mistakes before this actually becomes a referral. "Edit" just closes the modal —
-     nothing in the form is cleared or resubmitted, so they can fix anything and try again. -->
+<!-- Review modal -->
 <div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -401,7 +475,25 @@ let reviewConfirmed = false;
 referralForm.addEventListener('submit', function (e) {
   if (reviewConfirmed) return; // second pass, after Confirm & Submit was clicked — let it through
   e.preventDefault();
-  if (!referralForm.reportValidity()) return; // shows native validation prompts for required fields
+  
+  if (!referralForm.reportValidity()) return; // shows native validation prompts for visible required fields
+
+  // The hidden preferred_time input isn't covered by native required validation
+  // (browsers skip hidden inputs during constraint validation), so check it manually.
+  const prefDateVal = fieldValue('preferred_date');
+  const prefTimeVal = document.getElementById('prefTime') ? document.getElementById('prefTime').value.trim() : fieldValue('preferred_time');
+  const timeErrorEl = document.getElementById('prefTimeError');
+
+  if (!prefDateVal || !prefTimeVal) {
+    if (timeErrorEl) {
+      timeErrorEl.classList.remove('d-none');
+    }
+    alert('Please select a preferred date and an available time slot.');
+    return;
+  } else if (timeErrorEl) {
+    timeErrorEl.classList.add('d-none');
+  }
+
   document.getElementById('reviewSummaryBody').innerHTML = buildReviewSummary();
   bootstrap.Modal.getOrCreateInstance(document.getElementById('reviewModal')).show();
 });

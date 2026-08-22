@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lastName = Validator::clean($_POST['last_name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $contact = Validator::clean($_POST['contact_number'] ?? '');
+        $educationLevel = Validator::clean($_POST['education_level'] ?? '');
         $course = Validator::clean($_POST['course'] ?? '');
         $yearLevel = Validator::clean($_POST['year_level'] ?? '');
         $section = Validator::clean($_POST['section'] ?? '');
@@ -34,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!Validator::required($idNumber)) $errors[] = 'Student ID number is required.';
         if (!Validator::required($firstName)) $errors[] = 'First name is required.';
         if (!Validator::required($lastName)) $errors[] = 'Last name is required.';
+        if (!in_array($educationLevel, ['junior_highschool', 'senior_highschool', 'college'], true)) $errors[] = 'Please select your education level.';
         if (!Validator::email($email)) $errors[] = 'A valid email is required.';
         if (!Validator::minLength($password, 8)) $errors[] = 'Password must be at least 8 characters.';
         if ($password !== $confirm) $errors[] = 'Passwords do not match.';
@@ -47,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'last_name' => $lastName,
                 'email' => $email,
                 'contact_number' => $contact,
+                'education_level' => $educationLevel,
                 'course' => $course,
                 'year_level' => $yearLevel,
                 'section' => $section,
@@ -90,6 +93,15 @@ include __DIR__ . '/partials/header.php';
         <div class="col-md-6 mb-3">
           <label class="form-label">Contact Number</label>
           <input type="text" name="contact_number" class="form-control" value="<?= htmlspecialchars($old['contact_number'] ?? '') ?>">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Education Level <span class="text-danger">*</span></label>
+          <select name="education_level" class="form-select" required>
+            <option value="" <?= empty($old['education_level']) ? 'selected' : '' ?>>-- Select Level --</option>
+            <option value="junior_highschool" <?= ($old['education_level'] ?? '') === 'junior_highschool' ? 'selected' : '' ?>>Junior Highschool</option>
+            <option value="senior_highschool" <?= ($old['education_level'] ?? '') === 'senior_highschool' ? 'selected' : '' ?>>Senior Highschool</option>
+            <option value="college" <?= ($old['education_level'] ?? '') === 'college' ? 'selected' : '' ?>>College</option>
+          </select>
         </div>
         <div class="col-md-6 mb-3">
           <label class="form-label">Course</label>

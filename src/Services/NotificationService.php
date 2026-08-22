@@ -36,6 +36,14 @@ class NotificationService
         Notification::create((int)$appointment['student_id'], $message, (int)$appointment['id']);
     }
 
+    public static function referralCancelled(array $referral): void
+    {
+        $message = "Your referral {$referral['referral_no']} has been cancelled by the Guidance Office. If you still need assistance, you can submit a new referral or pick a new time using the same details from your My Requests page.";
+        if ($referral['student_id']) {
+            Notification::create((int)$referral['student_id'], $message, null, 'in-app', (int)$referral['id']);
+        }
+    }
+
     public static function reminder(array $appointment): void
     {
         Notification::create(

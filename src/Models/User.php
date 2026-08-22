@@ -12,6 +12,23 @@ class User
         return $row ?: null;
     }
 
+    public static function findByLogin(string $login): ?array
+    {
+        $db = Database::getConnection();
+        // Match by email OR username — CMS-pushed students have
+        // username set but email NULL, so they log in with username.
+        // Legacy admin/counselor accounts have email set but username
+        // NULL, so they continue to log in with email.
+        $stmt = $db->prepare(
+            'SELECT * FROM users 
+             WHERE email = ? OR username = ? 
+             LIMIT 1'
+        );
+        $stmt->execute([$login, $login]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
     public static function findById(int $id): ?array
     {
         $db = Database::getConnection();
@@ -28,6 +45,55 @@ class User
         $stmt->execute([$userId]);
         $row = $stmt->fetch();
         return $row ?: null;
+    }
+
+    /**
+     * Get the counselor assigned to handle a student's education level.
+     * Junior Highschool -> counselor with education_level_group = 'junior_highschool'
+     * Senior Highschool / College -> counselor with education_level_group = 'senior_college'
+     */
+    public static function getCounselorForStudent(int $studentId): ?array
+    {
+        $profile = self::studentProfile($studentId);
+        if (!$profile || empty($profile['education_level'])) {
+            return null;
+        }
+
+        $db = Database::getConnection();
+
+        if ($profile['education_level'] === 'junior_highschool') {
+            $group = 'junior_highschool';
+        } else {
+            // Both senior_highschool and college go to the same counselor
+            $group = 'senior_college';
+        }
+
+        $stmt = $db->prepare(
+            "SELECT u.id, u.first_name, u.last_name, cp.specialization, cp.office_location
+             FROM users u
+             JOIN counselor_profiles cp ON cp.user_id = u.id
+             WHERE u.role = 'counselor' AND u.status = 'active'
+               AND cp.education_level_group = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$group]);
+        $counselor = $stmt->fetch();
+        return $counselor ?: null;
+    }
+
+    /**
+     * Save/update a student's education level.
+     */
+    public static function saveEducationLevel(int $userId, string $level): void
+    {
+        $db = Database::getConnection();
+        // Use UPSERT — old CMS-synced students may not have a student_profiles row yet
+        $stmt = $db->prepare(
+            'INSERT INTO student_profiles (user_id, education_level)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE education_level = VALUES(education_level)'
+        );
+        $stmt->execute([$userId, $level]);
     }
 
     public static function idNumberExists(string $idNumber): bool
@@ -59,14 +125,15 @@ class User
             $userId = (int)$db->lastInsertId();
 
             $stmt2 = $db->prepare(
-                'INSERT INTO student_profiles (user_id, course, year_level, section)
-                 VALUES (:user_id, :course, :year_level, :section)'
+                'INSERT INTO student_profiles (user_id, course, year_level, section, education_level)
+                 VALUES (:user_id, :course, :year_level, :section, :education_level)'
             );
             $stmt2->execute([
                 'user_id' => $userId,
                 'course' => $data['course'] ?? null,
                 'year_level' => $data['year_level'] ?? null,
                 'section' => $data['section'] ?? null,
+                'education_level' => $data['education_level'] ?? null,
             ]);
 
             $db->commit();
@@ -105,10 +172,17 @@ class User
         return $userId;
     }
 
-    public static function authenticate(string $email, string $password): ?array
+    public static function authenticate(string $login, string $password): ?array
     {
-        $user = self::findByEmail($email);
+        // Accept either email or username — CMS-pushed students have
+        // username but no email; legacy accounts have email but no username.
+        $user = self::findByLogin($login);
         if (!$user || $user['status'] !== 'active') {
+            return null;
+        }
+        // Also respect the new is_active flag (set to 0 by CMS sync
+        // when a student is deleted from classroom_db2).
+        if (isset($user['is_active']) && (int)$user['is_active'] !== 1) {
             return null;
         }
         if (!password_verify($password, $user['password_hash'])) {
@@ -118,14 +192,44 @@ class User
         return $user;
     }
 
-    public static function allByRole(string $role): array
+public static function allByRole(string $role): array
     {
         $db = Database::getConnection();
-        $stmt = $db->prepare('SELECT id, id_number, first_name, last_name, email, status, created_at FROM users WHERE role = ? ORDER BY last_name');
+        
+        if ($role === ROLE_STUDENT) {
+            // Join student profiles
+            $stmt = $db->prepare('
+                SELECT u.id, u.id_number, u.first_name, u.last_name, u.email, u.status, u.created_at,
+                       sp.course, sp.year_level, sp.section
+                FROM users u
+                LEFT JOIN student_profiles sp ON u.id = sp.user_id
+                WHERE u.role = ? 
+                ORDER BY u.last_name
+            ');
+        } elseif ($role === ROLE_COUNSELOR) {
+            // Join counselor profiles
+            $stmt = $db->prepare('
+                SELECT u.id, u.id_number, u.first_name, u.last_name, u.email, u.status, u.created_at,
+                       cp.specialization
+                FROM users u
+                LEFT JOIN counselor_profiles cp ON u.id = cp.user_id
+                WHERE u.role = ? 
+                ORDER BY u.last_name
+            ');
+        } else {
+            // Standard query for Admins
+            $stmt = $db->prepare('
+                SELECT id, id_number, first_name, last_name, email, status, created_at 
+                FROM users 
+                WHERE role = ? 
+                ORDER BY last_name
+            ');
+        }
+        
         $stmt->execute([$role]);
-        return $stmt->fetchAll();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
-
+    
     public static function setStatus(int $userId, string $status): void
     {
         $db = Database::getConnection();

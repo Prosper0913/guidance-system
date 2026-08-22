@@ -3,13 +3,15 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../src/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../../src/Models/Appointment.php';
 require_once __DIR__ . '/../../src/Models/Referral.php';
+require_once __DIR__ . '/../../src/Models/GoogleToken.php';
 require_once __DIR__ . '/../../src/Helpers/Csrf.php';
 
 $user = AuthMiddleware::requireRole([ROLE_COUNSELOR]);
 $pending = Appointment::forCounselor($user['id'], STATUS_PENDING);
 $approved = Appointment::forCounselor($user['id'], STATUS_APPROVED);
 $myReferrals = Referral::forCounselor($user['id']);
-$pendingReferralsGlobal = Referral::countByStatus('pending');
+$myPendingReferrals = count(array_filter($myReferrals, fn($r) => $r['status'] === 'pending'));
+$googleConnected = GoogleToken::isConnected($user['id']);
 
 $pageTitle = 'Counselor Dashboard';
 include __DIR__ . '/../partials/header.php';
@@ -31,9 +33,38 @@ include __DIR__ . '/../partials/flash.php';
     <h6 class="text-muted">My Assigned Referrals</h6><h2><?= count($myReferrals) ?></h2>
   </div></div></div>
   <div class="col-md-4 mb-3"><div class="card"><div class="card-body">
-    <h6 class="text-muted">Referrals Awaiting Triage (all)</h6><h2><?= $pendingReferralsGlobal ?></h2>
-    <a href="appointments.php?tab=referrals" class="btn btn-sm btn-outline-primary mt-2">View Referrals</a>
+    <h6 class="text-muted">My Pending Referrals</h6><h2><?= $myPendingReferrals ?></h2>
+    <a href="appointments.php?tab=referrals" class="btn btn-sm btn-outline-primary mt-2">View My Referrals</a>
   </div></div></div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>Google Calendar</span>
+    <?php if ($googleConnected): ?>
+      <div class="d-flex align-items-center">
+        <button type="button" class="btn btn-sm btn-outline-light" id="gcalPrevBtn">‹</button>
+        <span id="gcalMonthLabel" class="mx-2 text-white small" style="min-width:130px;text-align:center;"></span>
+        <button type="button" class="btn btn-sm btn-outline-light" id="gcalNextBtn">›</button>
+      </div>
+    <?php endif; ?>
+  </div>
+  <div class="card-body">
+    <?php if (!$googleConnected): ?>
+      <p class="text-muted mb-0">Connect your Google Calendar in <a href="availability.php">Availability</a> to see your events here, right on the dashboard.</p>
+    <?php else: ?>
+      <div class="row">
+        <div class="col-md-7 mb-3 mb-md-0">
+          <div id="gcalWeekdays" class="gcal-grid gcal-weekdays"></div>
+          <div id="gcalGrid" class="gcal-grid"></div>
+        </div>
+        <div class="col-md-5">
+          <h6 id="gcalAgendaLabel" class="text-muted small text-uppercase mb-2">Today</h6>
+          <div id="gcalAgenda"></div>
+        </div>
+      </div>
+    <?php endif; ?>
+  </div>
 </div>
 
 <div class="card mb-4">

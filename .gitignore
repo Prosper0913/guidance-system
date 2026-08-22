@@ -2,11 +2,19 @@
 /vendor/
 /uploads/*
 !/uploads/.gitkeep
+/logs/*
+!/logs/.gitkeep
 *.log
 *.sql.bak
 .DS_Store
 Thumbs.db
+
+# Real local config with live credentials — copy the .example.php files instead
 config/database.php
 config/google.php
+config/cms_sync.php
+
+# Real data dumps — migration_*.sql scripts ARE meant to be committed, this is
+# only the actual database export with real student/referral data in it
+database/guidance_appointment_system.sql
 full_backup.sql
-*.sql.bak
