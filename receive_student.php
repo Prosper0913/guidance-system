@@ -100,8 +100,8 @@ try {
     );
     // All CMS students are college-level — default to 'college' if not provided
 $education_level_val = (!empty($education_level) && $education_level !== '') ? $education_level : 'college';
-    $upP->bind_param('isssss', $user_id, $course, $year_level, $section, $education_level_val);
-    $upP->execute();
+ $upP->bind_param('issss', $user_id, $course, $year_level, $section, $education_level_val);
+     $upP->execute();
 
     // 3. Upsert enrollments
     $payload_enrollment_keys = [];
@@ -128,10 +128,10 @@ $education_level_val = (!empty($education_level) && $education_level !== '') ? $
                 is_active = 1,
                 synced_at = NOW()"
         );
-        $upE->bind_param('iisssss',
-            $user_id, $cms_section_id, $cms_subject_id,
-            $enr_course, $enr_section_name, $enr_subject_code, $enr_subject_name
-        );
+ $upE->bind_param('iiissss',
+    $user_id, $cms_section_id, $cms_subject_id,
+    $enr_course, $enr_section_name, $enr_subject_code, $enr_subject_name
+);
         $upE->execute();
         $enrollments_upserted++;
         $payload_enrollment_keys[] = $cms_section_id . ':' . $cms_subject_id;
