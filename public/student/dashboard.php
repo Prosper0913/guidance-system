@@ -48,6 +48,7 @@ include __DIR__ . '/../partials/flash.php';
     <?php if (!$upcoming): ?>
       <p class="text-muted mb-0">No upcoming appointments yet. <a href="<?= BASE_URL ?>/student/book-appointment.php">Submit a request</a> and the Guidance Office will schedule one for you.</p>
     <?php else: ?>
+      <div class="table-responsive">
       <table class="table">
         <thead><tr><th>Date</th><th>Time</th><th>Counselor</th><th>Type</th><th>Status</th></tr></thead>
         <tbody>
@@ -62,6 +63,7 @@ include __DIR__ . '/../partials/flash.php';
         <?php endforeach; ?>
         </tbody>
       </table>
+      </div>
     <?php endif; ?>
   </div>
 </div>
@@ -70,6 +72,7 @@ include __DIR__ . '/../partials/flash.php';
 <div class="card">
   <div class="card-header">Requests Awaiting Guidance Office Review</div>
   <div class="card-body">
+    <div class="table-responsive">
     <table class="table">
       <thead><tr><th>Ref No.</th><th>Submitted</th></tr></thead>
       <tbody>
@@ -81,6 +84,7 @@ include __DIR__ . '/../partials/flash.php';
       <?php endforeach; ?>
       </tbody>
     </table>
+    </div>
     <a href="<?= BASE_URL ?>/student/my-appointments.php?tab=referrals" class="btn btn-sm btn-outline-primary">View All Requests</a>
   </div>
 </div>

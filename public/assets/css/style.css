@@ -283,17 +283,10 @@ a:hover { color: var(--brand-green-dark); }
     white-space: normal;
   }
 
-  /* Any table sitting in a card becomes horizontally scrollable instead
-     of forcing the card (and the whole page) wider than the screen.
-     Only the outer <table> changes display — thead/tbody/tr/td keep
-     their normal table display roles, otherwise cells collapse to fit
-     only their own content and short text/buttons wrap letter-by-letter. */
-  .card-body table {
-    display: block;
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+  /* Tables are wrapped in .table-responsive (Bootstrap-native) in the PHP
+     templates themselves — that lets the browser's normal table layout
+     algorithm run untouched and just scrolls the wrapper when needed,
+     instead of fighting the layout with display:block on <table>. */
 
   /* Shrink text, badges, and buttons so more fits before scrolling is
      even needed, and so everything reads less cramped on a small screen. */

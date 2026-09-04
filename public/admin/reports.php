@@ -20,11 +20,13 @@ include __DIR__ . '/../partials/header.php';
 <div class="row">
   <div class="col-md-6 mb-4">
     <div class="card"><div class="card-header">Appointments by Status</div><div class="card-body">
+      <div class="table-responsive">
       <table class="table table-sm"><tbody>
       <?php foreach ($statusSummary as $r): ?>
         <tr><td><?= ucfirst($r['status']) ?></td><td class="text-end"><?= $r['total'] ?></td></tr>
       <?php endforeach; ?>
       </tbody></table>
+      </div>
     </div></div>
   </div>
 
@@ -51,21 +53,25 @@ include __DIR__ . '/../partials/header.php';
 
   <div class="col-md-6 mb-4">
     <div class="card"><div class="card-header">Counselor Caseload</div><div class="card-body">
+      <div class="table-responsive">
       <table class="table table-sm"><tbody>
       <?php foreach ($caseload as $r): ?>
         <tr><td><?= htmlspecialchars($r['first_name'] . ' ' . $r['last_name']) ?></td><td class="text-end"><?= $r['total_appointments'] ?></td></tr>
       <?php endforeach; ?>
       </tbody></table>
+      </div>
     </div></div>
   </div>
 
   <div class="col-md-6 mb-4">
     <div class="card"><div class="card-header">Busiest Time Slots</div><div class="card-body">
+      <div class="table-responsive">
       <table class="table table-sm"><tbody>
       <?php foreach ($busiest as $r): ?>
         <tr><td><?= date('g:i A', strtotime($r['appointment_time'])) ?></td><td class="text-end"><?= $r['total'] ?></td></tr>
       <?php endforeach; ?>
       </tbody></table>
+      </div>
     </div></div>
   </div>
 

@@ -191,6 +191,7 @@ $contact = $user['contact_number'] ?? $user['email'];
       <?= Csrf::field() ?>
 
       <h5>I. Student Information</h5>
+      <div class="table-responsive">
       <table class="table table-bordered table-sm w-auto">
         <tbody>
           <tr><th class="table-light" style="width:260px;">Student's Name</th><td><?= htmlspecialchars($fullName) ?></td></tr>
@@ -213,6 +214,7 @@ $contact = $user['contact_number'] ?? $user['email'];
           <tr><th class="table-light">Contact Number / Email</th><td><?= htmlspecialchars($contact) ?></td></tr>
         </tbody>
       </table>
+      </div>
       <p class="text-muted small">Pulled from your account profile. Contact the Registrar's/Guidance Office to correct any of these details.</p>
 
       <h5 class="mt-4">II. Referring Party Information</h5>

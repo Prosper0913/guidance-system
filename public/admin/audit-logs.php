@@ -25,6 +25,7 @@ include __DIR__ . '/../partials/header.php';
     <?php if (!$logs): ?>
       <p class="text-muted mb-0">No log entries yet.</p>
     <?php else: ?>
+      <div class="table-responsive">
       <table class="table table-sm">
         <thead><tr><th>When</th><th>Appointment</th><th>Changed By</th><th>Old Status</th><th>New Status</th><th>Remarks</th></tr></thead>
         <tbody>
@@ -40,6 +41,7 @@ include __DIR__ . '/../partials/header.php';
         <?php endforeach; ?>
         </tbody>
       </table>
+      </div>
     <?php endif; ?>
   </div>
 </div>

@@ -129,6 +129,7 @@ include __DIR__ . '/../partials/flash.php';
     <div class="card mb-4">
       <div class="card-header">Student Information</div>
       <div class="card-body">
+        <div class="table-responsive">
         <table class="table table-sm mb-0">
           <tr><th style="width:40%">Name</th><td><?= htmlspecialchars($referral['student_name']) ?></td></tr>
           <tr><th>Student ID</th><td><?= htmlspecialchars($referral['student_id_number'] ?? '—') ?></td></tr>
@@ -144,6 +145,7 @@ include __DIR__ . '/../partials/flash.php';
             <?php endif; ?>
           </td></tr>
         </table>
+        </div>
 
         <?php if (!$referral['student_id']): ?>
           <hr>
@@ -185,6 +187,7 @@ include __DIR__ . '/../partials/flash.php';
             <a href="resolve-conflict.php?date=<?= urlencode($referral['preferred_date']) ?>&time=<?= urlencode($referral['preferred_time']) ?>" class="btn btn-sm btn-warning ms-2">Resolve Conflict</a>
           </div>
         <?php endif; ?>
+        <div class="table-responsive">
         <table class="table table-sm mb-0">
           <?php if ($referral['preferred_type']): ?>
             <tr><th style="width:40%">Preferred Method</th><td><?= ucfirst($referral['preferred_type']) ?></td></tr>
@@ -199,6 +202,7 @@ include __DIR__ . '/../partials/flash.php';
             <tr><th>Preferred Time</th><td><?= htmlspecialchars(date('g:i A', strtotime($referral['preferred_time']))) ?></td></tr>
           <?php endif; ?>
         </table>
+        </div>
       </div>
     </div>
     <?php endif; ?>
@@ -206,6 +210,7 @@ include __DIR__ . '/../partials/flash.php';
     <div class="card mb-4">
       <div class="card-header">Referring Party</div>
       <div class="card-body">
+        <div class="table-responsive">
         <table class="table table-sm mb-0">
           <tr><th style="width:40%">Name</th><td><?= htmlspecialchars($referral['referring_party_name']) ?></td></tr>
           <tr><th>Position/Relationship</th><td><?= htmlspecialchars($referral['referring_party_position'] ?? '—') ?></td></tr>
@@ -213,6 +218,7 @@ include __DIR__ . '/../partials/flash.php';
           <tr><th>Contact</th><td><?= htmlspecialchars($referral['referring_party_contact'] ?? '—') ?></td></tr>
           <tr><th>Date Submitted</th><td><?= htmlspecialchars($referral['referral_date']) ?></td></tr>
         </table>
+        </div>
       </div>
     </div>
 
@@ -333,10 +339,12 @@ include __DIR__ . '/../partials/flash.php';
         <div class="card-body">
           <?php if ($referral['preferred_date'] && $referral['preferred_time']): ?>
             <p class="text-muted small mb-3">This is the date and time the student requested when submitting the referral. It is fixed and cannot be changed here.</p>
+            <div class="table-responsive">
             <table class="table table-sm mb-3">
               <tr><th style="width:40%">Date</th><td><?= htmlspecialchars(date('F j, Y (l)', strtotime($referral['preferred_date']))) ?></td></tr>
               <tr><th>Time</th><td><?= htmlspecialchars(date('g:i A', strtotime($referral['preferred_time']))) ?></td></tr>
             </table>
+            </div>
             <form method="post" id="scheduleForm">
               <?= Csrf::field() ?>
               <input type="hidden" name="appointment_date" value="<?= htmlspecialchars($referral['preferred_date']) ?>">

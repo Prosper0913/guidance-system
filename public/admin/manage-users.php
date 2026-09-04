@@ -90,7 +90,7 @@ function renderUserTable($title, $rows, $type = 'admin') {
   if (!$rows) {
     echo '<p class="text-muted mb-0">None yet.</p>';
   } else {
-    echo '<table class="table align-middle"><thead><tr><th>Name</th><th>ID No.</th><th>Email</th>';
+    echo '<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Name</th><th>ID No.</th><th>Email</th>';
     
     // Dynamic Headers
     if ($type === 'student') {
@@ -125,7 +125,7 @@ function renderUserTable($title, $rows, $type = 'admin') {
          . '<input type="hidden" name="new_status" value="' . $newStatus . '">'
          . '<button type="submit" name="toggle_status" class="btn btn-sm ' . $btnClass . '">' . $btnLabel . '</button></form></td></tr>';
     }
-    echo '</tbody></table>';
+    echo '</tbody></table></div>';
   }
   echo '</div></div>';
 }

@@ -66,6 +66,7 @@ include __DIR__ . '/../partials/flash.php';
       <?php if (!$appointments): ?>
         <p class="text-muted mb-0">No appointments scheduled yet. <a href="<?= BASE_URL ?>/student/book-appointment.php">Submit a request</a> and the Guidance Office will schedule one for you.</p>
       <?php else: ?>
+        <div class="table-responsive">
         <table class="table align-middle">
           <thead><tr><th>Date</th><th>Time</th><th>Counselor</th><th>Category</th><th>Type</th><th>Status</th><th></th></tr></thead>
           <tbody>
@@ -90,6 +91,7 @@ include __DIR__ . '/../partials/flash.php';
           <?php endforeach; ?>
           </tbody>
         </table>
+        </div>
       <?php endif; ?>
     </div>
   </div>
@@ -101,6 +103,7 @@ include __DIR__ . '/../partials/flash.php';
       <?php if (!$referrals): ?>
         <p class="text-muted mb-0">You haven't submitted any requests yet. <a href="<?= BASE_URL ?>/student/book-appointment.php">Submit one now</a>.</p>
       <?php else: ?>
+        <div class="table-responsive">
         <table class="table align-middle">
           <thead><tr><th>Ref No.</th><th>Submitted</th><th>Status</th><th>Assigned Counselor</th><th>Scheduled Appointment</th></tr></thead>
           <tbody>
@@ -126,6 +129,7 @@ include __DIR__ . '/../partials/flash.php';
           <?php endforeach; ?>
           </tbody>
         </table>
+        </div>
       <?php endif; ?>
     </div>
   </div>

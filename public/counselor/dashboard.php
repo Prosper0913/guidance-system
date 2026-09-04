@@ -73,6 +73,7 @@ include __DIR__ . '/../partials/flash.php';
     <?php if (!$pending): ?>
       <p class="text-muted mb-0">No pending requests.</p>
     <?php else: ?>
+      <div class="table-responsive">
       <table class="table" id="pendingTable">
         <thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Type</th><th>Category</th><th>Actions</th></tr></thead>
         <tbody>
@@ -97,6 +98,7 @@ include __DIR__ . '/../partials/flash.php';
         <?php endforeach; ?>
         </tbody>
       </table>
+      </div>
     <?php endif; ?>
   </div>
 </div>
