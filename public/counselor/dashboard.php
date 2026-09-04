@@ -73,8 +73,9 @@ include __DIR__ . '/../partials/flash.php';
     <?php if (!$pending): ?>
       <p class="text-muted mb-0">No pending requests.</p>
     <?php else: ?>
+      <p class="swipe-hint d-md-none">⟷ Swipe left/right to see more</p>
       <div class="table-responsive">
-      <table class="table" id="pendingTable">
+      <table class="table table-compact" id="pendingTable">
         <thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Type</th><th>Category</th><th>Actions</th></tr></thead>
         <tbody>
         <?php foreach ($pending as $a): ?>

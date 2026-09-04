@@ -66,8 +66,9 @@ include __DIR__ . '/../partials/flash.php';
         <?php if (!$appointments): ?>
           <p class="text-muted mb-0">No appointments found.</p>
         <?php else: ?>
+          <p class="swipe-hint d-md-none">⟷ Swipe left/right to see more</p>
           <div class="table-responsive">
-          <table class="table align-middle" id="apptTable">
+          <table class="table align-middle table-compact" id="apptTable">
             <thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Type</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($appointments as $a): ?>
@@ -121,8 +122,9 @@ include __DIR__ . '/../partials/flash.php';
       <?php if (!$referrals): ?>
         <p class="text-muted mb-0">No referrals found.</p>
       <?php else: ?>
+        <p class="swipe-hint d-md-none">⟷ Swipe left/right to see more</p>
         <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle table-compact">
           <thead><tr><th>Ref No.</th><th>Date</th><th>Student</th><th>Referred By</th><th>Urgency</th><th>Status</th><th>Assigned</th><th></th></tr></thead>
           <tbody>
           <?php foreach ($referrals as $r): ?>

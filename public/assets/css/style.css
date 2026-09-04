@@ -193,6 +193,39 @@ a:hover { color: var(--brand-green-dark); }
   word-break: break-word;
 }
 
+/* Multi-column data tables (dates, badges, buttons) — keep every cell on
+   one line and rely on the horizontal swipe/scroll from .table-responsive,
+   instead of letting cells shrink and wrap button/badge text mid-word. */
+.table-compact td, .table-compact th {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+@media (max-width: 767.98px) {
+  .table-compact {
+    font-size: 0.8rem;
+  }
+  .table-compact td, .table-compact th {
+    padding: 0.45rem 0.5rem;
+  }
+  .table-compact .btn {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.5rem;
+  }
+  .table-compact .badge {
+    font-size: 0.68rem;
+    padding: 0.25em 0.45em;
+  }
+}
+
+/* Small hint shown above a swipeable table, mobile only */
+.swipe-hint {
+  font-size: 0.78rem;
+  color: #6c757d;
+  margin-bottom: 0.4rem;
+}
+
 /* ===== Status badges ===== */
 .badge { font-weight: 500; border-radius: 6px; padding: 0.4em 0.7em; }
 .badge-status-pending     { background-color: #E8A93B; }

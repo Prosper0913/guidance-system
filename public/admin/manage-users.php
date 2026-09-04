@@ -90,7 +90,7 @@ function renderUserTable($title, $rows, $type = 'admin') {
   if (!$rows) {
     echo '<p class="text-muted mb-0">None yet.</p>';
   } else {
-    echo '<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Name</th><th>ID No.</th><th>Email</th>';
+    echo '<p class="swipe-hint d-md-none">⟷ Swipe left/right to see more</p><div class="table-responsive"><table class="table align-middle table-compact"><thead><tr><th>Name</th><th>ID No.</th><th>Email</th>';
     
     // Dynamic Headers
     if ($type === 'student') {
