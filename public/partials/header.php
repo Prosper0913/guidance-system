@@ -33,8 +33,7 @@ $unread = $user ? Notification::unreadCount($user['id']) : 0;
 <?php if ($user): ?>
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar">
   <div class="container-fluid">
-    <a class="navbar-brand" href="<?= BASE_URL ?>/<?= $user['role'] ?>/dashboard.php"> <img src="<?= BASE_URL ?>/assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 50px;"> <?= APP_NAME ?></a>
-      <div class="divider"></div>
+    <a class="navbar-brand" href="<?= BASE_URL ?>/<?= $user['role'] ?>/dashboard.php"> <img src="<?= BASE_URL ?>/assets/images/TCM logo (2).png" alt="TCM Logo" class="brand-logo"> <span class="brand-text"><?= APP_NAME ?></span></a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -86,7 +85,7 @@ $unread = $user ? Notification::unreadCount($user['id']) : 0;
 <?php else: ?>
 <nav class="navbar navbar-expand navbar-dark app-navbar">
   <div class="container-fluid">
-    <span class="navbar-brand"><img src="assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 50px;"> <?= APP_NAME ?></span>
+    <span class="navbar-brand"><img src="assets/images/TCM logo (2).png" alt="TCM Logo" class="brand-logo"> <span class="brand-text"><?= APP_NAME ?></span></span>
     <ul class="navbar-nav ms-auto">
       <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/login.php">Login</a></li>
     </ul>

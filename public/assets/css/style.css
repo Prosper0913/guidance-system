@@ -18,6 +18,10 @@
 
 * { box-sizing: border-box; }
 
+html, body {
+  overflow-x: hidden; /* prevents any stray wide element from creating page-wide horizontal scroll */
+}
+
 body {
   background-color: var(--brand-bg);
   font-family: var(--font-body);
@@ -31,8 +35,11 @@ body {
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
-  background-image: url('../images/TCM\ logo\ \(2\).png');
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('../images/TCM logo (2).png');
   background-repeat: no-repeat;
   background-position: center;
   background-size: 40%;
@@ -66,6 +73,14 @@ a:hover { color: var(--brand-green-dark); }
   color: #ffffff !important;
   font-weight: 700;
   font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-navbar .navbar-brand .brand-logo {
+  height: 42px;
+  flex-shrink: 0;
 }
 
 .app-navbar .nav-link {
@@ -173,6 +188,10 @@ a:hover { color: var(--brand-green-dark); }
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+.table td, .table th {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
 
 /* ===== Status badges ===== */
 .badge { font-weight: 500; border-radius: 6px; padding: 0.4em 0.7em; }
@@ -248,3 +267,48 @@ a:hover { color: var(--brand-green-dark); }
 .gcal-dot { position: absolute; bottom: 4px; width: 5px; height: 5px; border-radius: 50%; background-color: var(--brand-green); }
 .gcal-day.gcal-selected .gcal-dot { background-color: #fff; }
 .gcal-agenda-item { background-color: #fff; }
+/* =====================================================
+   Mobile (< 768px)
+   ===================================================== */
+@media (max-width: 767.98px) {
+  /* Keep the navbar to logo + hamburger only — full nav is reachable
+     only by tapping the toggler (navbar-expand-lg already hides
+     .navbar-collapse below the lg breakpoint; this just keeps the
+     visible brand row itself from overflowing before that kicks in). */
+  .app-navbar .navbar-brand .brand-logo {
+    height: 32px;
+  }
+  .app-navbar .navbar-brand .brand-text {
+    font-size: 0.95rem;
+    white-space: normal;
+  }
+
+  /* Any table sitting in a card becomes horizontally scrollable instead
+     of forcing the card (and the whole page) wider than the screen. */
+  .card-body table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .card-body table thead,
+  .card-body table tbody {
+    display: table;
+    width: 100%;
+  }
+
+  /* The watermark logo is small and faint by design on desktop — bump
+     it up slightly on small screens so it's still noticeable at all. */
+  body::before {
+    background-size: 70%;
+    opacity: 0.08;
+  }
+}
+
+@media (max-width: 400px) {
+  /* On very narrow phones, drop the app name text and keep just the
+     logo mark so the brand never competes with the toggler for space. */
+  .app-navbar .navbar-brand .brand-text {
+    display: none;
+  }
+}
