@@ -18,9 +18,12 @@
 
 * { box-sizing: border-box; }
 
-html, body {
-  overflow-x: hidden; /* prevents any stray wide element from creating page-wide horizontal scroll */
-}
+/* Note: deliberately NOT setting overflow-x: hidden on html/body — on
+   mobile browsers that reliably breaks the touch swipe gesture for any
+   nested horizontally-scrollable element (like .table-responsive below),
+   even though the scroll mechanics remain technically correct. The
+   underlying causes of page-wide overflow (navbar sizing, unwrapped
+   tables) are fixed directly instead. */
 
 body {
   background-color: var(--brand-bg);
@@ -220,6 +223,14 @@ a:hover { color: var(--brand-green-dark); }
 }
 
 /* Small hint shown above a swipeable table, mobile only */
+/* Explicit touch-scroll support — Bootstrap's own .table-responsive sets
+   overflow-x: auto but doesn't declare touch-action, which on some mobile
+   browsers is needed for the swipe gesture to be reliably recognized. */
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+
 .swipe-hint {
   font-size: 0.78rem;
   color: #6c757d;
