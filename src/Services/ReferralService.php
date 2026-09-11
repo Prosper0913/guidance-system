@@ -84,7 +84,7 @@ class ReferralService
             $stmt = $db->prepare(
                 "INSERT INTO appointments
                  (student_id, counselor_id, type, appointment_date, appointment_time, status, is_confidential, notes)
-                 VALUES (?, ?, 'walk-in', ?, ?, 'approved', 1, ?)"
+                 VALUES (?, ?, 'online', ?, ?, 'approved', 1, ?)"
             );
             $stmt->execute([$referral['student_id'], $referral['assigned_counselor_id'], $date, $time, $notes]);
             $appointmentId = (int)$db->lastInsertId();
