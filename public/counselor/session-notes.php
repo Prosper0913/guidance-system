@@ -18,11 +18,19 @@ $db = Database::getConnection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::validate($_POST['csrf_token'] ?? null)) {
     $notes = trim($_POST['notes'] ?? '');
+    $shareWithStudent = !empty($_POST['visible_to_student']) ? 1 : 0;
     if ($notes !== '') {
         $stmt = $db->prepare(
-            'INSERT INTO session_notes (appointment_id, counselor_id, notes, is_confidential) VALUES (?, ?, ?, 1)'
+            'INSERT INTO session_notes (appointment_id, counselor_id, notes, is_confidential, visible_to_student) VALUES (?, ?, ?, 1, ?)'
         );
-        $stmt->execute([$appointmentId, $user['id'], $notes]);
+        $stmt->execute([$appointmentId, $user['id'], $notes, $shareWithStudent]);
+        if ($shareWithStudent) {
+            require_once __DIR__ . '/../../src/Services/NotificationService.php';
+            NotificationService::customMessage(
+                $appointment,
+                'Your counselor added a note to your ' . $appointment['appointment_date'] . ' appointment that you can now view.'
+            );
+        }
         $_SESSION['flash'] = ['type' => 'success', 'message' => 'Session note saved.'];
     }
     header('Location: ' . BASE_URL . '/counselor/session-notes.php?appointment_id=' . $appointmentId);
@@ -44,11 +52,17 @@ include __DIR__ . '/../partials/flash.php';
 </p>
 
 <div class="card mb-4">
-  <div class="card-header">Add Note (confidential — visible to you and admin only)</div>
+  <div class="card-header">Add Note</div>
   <div class="card-body">
     <form method="post">
       <?= Csrf::field() ?>
       <textarea name="notes" class="form-control mb-2" rows="4" required></textarea>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="visible_to_student" value="1" id="visible_to_student">
+        <label class="form-check-label" for="visible_to_student">
+          Share this note with the student (they'll be able to see it on their appointments page)
+        </label>
+      </div>
       <button type="submit" class="btn btn-primary">Save Note</button>
     </form>
   </div>
@@ -62,7 +76,14 @@ include __DIR__ . '/../partials/flash.php';
     <?php else: ?>
       <?php foreach ($notes as $n): ?>
         <div class="border-bottom pb-2 mb-2">
-          <div class="small text-muted"><?= date('M j, Y g:i A', strtotime($n['created_at'])) ?></div>
+          <div class="small text-muted d-flex justify-content-between">
+            <span><?= date('M j, Y g:i A', strtotime($n['created_at'])) ?></span>
+            <?php if ($n['visible_to_student']): ?>
+              <span class="badge bg-info text-dark">Shared with student</span>
+            <?php else: ?>
+              <span class="badge bg-secondary">Private</span>
+            <?php endif; ?>
+          </div>
           <div><?= nl2br(htmlspecialchars($n['notes'])) ?></div>
         </div>
       <?php endforeach; ?>

@@ -244,6 +244,86 @@ class Appointment
         return $stmt->fetchAll();
     }
 
+    /**
+     * Counselor-recorded walk-in: the student came to the office in person (or filled out
+     * the paper form) rather than booking through the site, so the counselor logs it here
+     * directly. Always stored with type = 'walk-in' regardless of the status chosen, so it's
+     * clearly distinguishable from appointments the student booked online themselves.
+     * Returns the new appointment ID.
+     */
+    public static function recordWalkIn(array $data): int
+    {
+        $db = Database::getConnection();
+        $db->beginTransaction();
+        try {
+            // Only guard against double-booking when this walk-in is itself taking an
+            // "approved" (i.e. upcoming, calendar-holding) slot — a completed/no-show/pending
+            // record doesn't hold a slot, so it can't conflict with anything.
+            if ($data['status'] === 'approved') {
+                $lock = $db->prepare(
+                    "SELECT id FROM appointments
+                     WHERE counselor_id = ? AND appointment_date = ? AND appointment_time = ?
+                     AND status = 'approved' FOR UPDATE"
+                );
+                $lock->execute([$data['counselor_id'], $data['appointment_date'], $data['appointment_time']]);
+                if ($lock->fetch()) {
+                    throw new RuntimeException('This slot is already taken by another approved appointment.');
+                }
+            }
+
+            $stmt = $db->prepare(
+                "INSERT INTO appointments
+                 (student_id, counselor_id, concern_category_id, type, appointment_date, appointment_time, status, is_confidential, notes)
+                 VALUES (:student_id, :counselor_id, :concern_category_id, 'walk-in', :appointment_date, :appointment_time, :status, :is_confidential, :notes)"
+            );
+            $stmt->execute([
+                'student_id' => $data['student_id'],
+                'counselor_id' => $data['counselor_id'],
+                'concern_category_id' => $data['concern_category_id'] ?: null,
+                'appointment_date' => $data['appointment_date'],
+                'appointment_time' => $data['appointment_time'],
+                'status' => $data['status'],
+                'is_confidential' => !empty($data['is_confidential']) ? 1 : 0,
+                'notes' => $data['notes'] ?: null,
+            ]);
+            $appointmentId = (int)$db->lastInsertId();
+
+            $log = $db->prepare(
+                'INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks)
+                 VALUES (?, NULL, ?, ?, ?)'
+            );
+            $log->execute([$appointmentId, $data['status'], $data['counselor_id'], 'Recorded as a walk-in appointment.']);
+
+            $db->commit();
+            return $appointmentId;
+        } catch (Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
+
+    // Session notes a counselor has explicitly chosen to share with this student,
+    // grouped by appointment_id (an appointment can have more than one shared note).
+    public static function sharedNotesForStudent(int $studentId): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT sn.appointment_id, sn.notes, sn.created_at,
+                    u.first_name AS counselor_first, u.last_name AS counselor_last
+             FROM session_notes sn
+             JOIN appointments a ON a.id = sn.appointment_id
+             JOIN users u ON u.id = sn.counselor_id
+             WHERE a.student_id = ? AND sn.visible_to_student = 1
+             ORDER BY sn.created_at DESC"
+        );
+        $stmt->execute([$studentId]);
+        $byAppointment = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $byAppointment[$row['appointment_id']][] = $row;
+        }
+        return $byAppointment;
+    }
+
     // Categories dropdown
     public static function categories(): array
     {

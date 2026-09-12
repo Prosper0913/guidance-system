@@ -54,11 +54,14 @@ include __DIR__ . '/../partials/flash.php';
   <?php if ($user['role'] !== ROLE_COUNSELOR): ?>
     <p class="text-muted">Appointments are managed per-counselor. Switch to the Referrals tab to triage incoming requests.</p>
   <?php else: ?>
-    <div class="mb-3">
-      <a class="btn btn-sm <?= $filter === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments">All</a>
-      <?php foreach (['pending','approved','completed','declined','cancelled','no-show'] as $s): ?>
-        <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments&status=<?= $s ?>"><?= ucfirst($s) ?></a>
-      <?php endforeach; ?>
+    <div class="mb-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <a class="btn btn-sm <?= $filter === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments">All</a>
+        <?php foreach (['pending','approved','completed','declined','cancelled','no-show'] as $s): ?>
+          <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments&status=<?= $s ?>"><?= ucfirst($s) ?></a>
+        <?php endforeach; ?>
+      </div>
+      <a class="btn btn-sm btn-outline-dark" href="record-walkin.php">+ Record Walk-in Appointment</a>
     </div>
 
     <div class="card">

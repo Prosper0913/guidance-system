@@ -282,6 +282,7 @@ CREATE TABLE `session_notes` (
   `counselor_id` int(11) NOT NULL,
   `notes` text NOT NULL,
   `is_confidential` tinyint(1) NOT NULL DEFAULT 1,
+  `visible_to_student` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

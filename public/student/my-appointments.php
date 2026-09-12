@@ -27,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_id'])) {
 $tab = ($_GET['tab'] ?? 'appointments') === 'referrals' ? 'referrals' : 'appointments';
 
 $appointments = $tab === 'appointments' ? Appointment::forStudent($user['id']) : [];
+$sharedNotes = $tab === 'appointments' ? Appointment::sharedNotesForStudent($user['id']) : [];
 $referrals = $tab === 'referrals' ? Referral::forStudent($user['id']) : [];
 
 $statusLabels = [
@@ -72,6 +73,7 @@ include __DIR__ . '/../partials/flash.php';
           <thead><tr><th>Date</th><th>Time</th><th>Counselor</th><th>Category</th><th>Type</th><th>Status</th><th></th></tr></thead>
           <tbody>
           <?php foreach ($appointments as $a): ?>
+            <?php $notesForThis = $sharedNotes[$a['id']] ?? []; ?>
             <tr>
               <td><?= htmlspecialchars($a['appointment_date']) ?></td>
               <td><?= date('g:i A', strtotime($a['appointment_time'])) ?></td>
@@ -87,8 +89,28 @@ include __DIR__ . '/../partials/flash.php';
                     <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
                   </form>
                 <?php endif; ?>
+                <?php if ($notesForThis): ?>
+                  <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#notes-<?= $a['id'] ?>">
+                    Counselor's Note<?= count($notesForThis) > 1 ? 's' : '' ?>
+                  </button>
+                <?php endif; ?>
               </td>
             </tr>
+            <?php if ($notesForThis): ?>
+              <tr class="collapse" id="notes-<?= $a['id'] ?>">
+                <td colspan="7" class="bg-light">
+                  <?php foreach ($notesForThis as $n): ?>
+                    <div class="border-bottom pb-2 mb-2">
+                      <div class="small text-muted">
+                        <?= htmlspecialchars($n['counselor_first'] . ' ' . $n['counselor_last']) ?>
+                        — <?= date('M j, Y g:i A', strtotime($n['created_at'])) ?>
+                      </div>
+                      <div><?= nl2br(htmlspecialchars($n['notes'])) ?></div>
+                    </div>
+                  <?php endforeach; ?>
+                </td>
+              </tr>
+            <?php endif; ?>
           <?php endforeach; ?>
           </tbody>
         </table>
