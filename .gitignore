@@ -13,6 +13,7 @@ Thumbs.db
 config/database.php
 config/google.php
 config/cms_sync.php
+readme.md
 
 # Real data dumps — migration_*.sql scripts ARE meant to be committed, this is
 # only the actual database export with real student/referral data in it

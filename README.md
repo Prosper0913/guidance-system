@@ -150,5 +150,11 @@ REMOVE PREFFERED METHOD IN REFERRAL FORM
 •
 
 <!--11/9/26 MAKE COUNSELOR ABLE TO CREATE STUDENT ACCOUNT
-    FILTER ALL STUDENTS INSIDE ADMIN
+    - FILTER ALL STUDENTS INSIDE ADMIN =========== DONE
+
+17/9/26 
+- add export all guidance history in counselor role (which exports all appointments including cancelled, the complete details, dates and everything.) also add a timeline filter if counselor wants to export specific timeline.
+- add a notification for counselor if an appointment from yesterday was never updated or marked complete cancelled no show or rescheduled.
+- admin shouldnt  be able to view referrals. 
+
      -->
