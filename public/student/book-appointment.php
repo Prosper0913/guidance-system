@@ -130,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'section_course_program' => $profile['course'] ?? null,
                 'sex' => in_array($_POST['sex'] ?? '', ['male', 'female'], true) ? $_POST['sex'] : null,
                 'student_contact' => $user['contact_number'] ?? $user['email'],
+                'submitted_via' => 'online',
                 'preferred_type' => in_array($_POST['preferred_type'] ?? '', ['online', 'online'], true) ? $_POST['preferred_type'] : null,
                 'preferred_counselor_id' => (int)($_POST['preferred_counselor_id'] ?? 0) ?: null,
                 'assigned_counselor_id' => $autoCounselor ? (int)$autoCounselor['id'] : null,

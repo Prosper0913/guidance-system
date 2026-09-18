@@ -103,7 +103,7 @@ class Referral
         $stmt = $db->prepare(
             'INSERT INTO referrals
              (department, referral_date, student_id, student_name, student_id_number, grade_year_level,
-              section_course_program, sex, student_contact, preferred_type, preferred_counselor_id,
+              section_course_program, sex, student_contact, submitted_via, preferred_type, preferred_counselor_id,
               assigned_counselor_id,
               preferred_date, preferred_time, referring_party_name, referring_party_position,
               referring_party_department, referring_party_contact, concerns, description_of_incident,
@@ -111,7 +111,7 @@ class Referral
               crisis_situation, consent_certified)
              VALUES
              (:department, :referral_date, :student_id, :student_name, :student_id_number, :grade_year_level,
-              :section_course_program, :sex, :student_contact, :preferred_type, :preferred_counselor_id,
+              :section_course_program, :sex, :student_contact, :submitted_via, :preferred_type, :preferred_counselor_id,
               :assigned_counselor_id,
               :preferred_date, :preferred_time, :referring_party_name, :referring_party_position,
               :referring_party_department, :referring_party_contact, :concerns, :description_of_incident,
@@ -128,6 +128,7 @@ class Referral
             'section_course_program' => $data['section_course_program'] ?? null,
             'sex' => $data['sex'] ?? null,
             'student_contact' => $data['student_contact'] ?? null,
+            'submitted_via' => in_array($data['submitted_via'] ?? '', ['online', 'walk-in'], true) ? $data['submitted_via'] : 'online',
             'preferred_type' => $data['preferred_type'] ?? null,
             'preferred_counselor_id' => $data['preferred_counselor_id'] ?? null,
             'assigned_counselor_id' => $data['assigned_counselor_id'] ?? null,

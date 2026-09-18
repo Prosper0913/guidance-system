@@ -106,7 +106,7 @@ function renderUserTable($title, $rows, $type = 'admin') {
       $btnClass = $u['status'] === 'active' ? 'btn-outline-danger' : 'btn-outline-success';
       $btnLabel = $u['status'] === 'active' ? 'Disable' : 'Activate';
       
-      echo '<tr><td>' . htmlspecialchars($u['last_name'] . ', ' . $u['first_name']) . '</td>';
+      echo '<tr><td>' . htmlspecialchars($u['first_name'] . ' ' . $u['last_name']) . '</td>';
       echo '<td>' . htmlspecialchars($u['id_number']) . '</td>';
       echo '<td>' . htmlspecialchars($u['email']) . '</td>';
       

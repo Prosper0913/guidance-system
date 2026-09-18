@@ -54,11 +54,14 @@ class ReferralService
     }
 
     /**
-     * Converts an accepted, student-linked referral into a scheduled (already-approved)
-     * appointment with the assigned counselor. Requires the referral to already be linked
-     * to a registered student account.
+     * Converts an accepted, student-linked referral into a scheduled appointment with the
+     * assigned counselor. Requires the referral to already be linked to a registered student
+     * account. $type should match how the referral itself came in ('online' for the student's
+     * own form, 'walk-in' for one a counselor recorded on the student's behalf) so the
+     * resulting appointment is labeled correctly. $status lets a walk-in that's already
+     * happened be recorded straight as 'completed' instead of always landing as 'approved'.
      */
-    public static function convertToAppointment(array $referral, string $date, string $time, int $scheduledBy): int
+    public static function convertToAppointment(array $referral, string $date, string $time, int $scheduledBy, string $type = 'online', string $status = 'approved'): int
     {
         if (empty($referral['student_id'])) {
             throw new RuntimeException('Link this referral to a registered student account before scheduling an appointment.');
@@ -66,34 +69,43 @@ class ReferralService
         if (empty($referral['assigned_counselor_id'])) {
             throw new RuntimeException('Assign a guidance counselor to this referral before scheduling an appointment.');
         }
+        if (!in_array($type, ['online', 'walk-in'], true)) {
+            $type = 'online';
+        }
+        if (!in_array($status, ['pending', 'approved', 'completed', 'no-show'], true)) {
+            $status = 'approved';
+        }
 
         $db = Database::getConnection();
         $db->beginTransaction();
         try {
-            // Guard against double-booking the counselor for this slot (approved-only rule)
-            $lock = $db->prepare(
-                "SELECT id FROM appointments WHERE counselor_id = ? AND appointment_date = ? AND appointment_time = ?
-                 AND status = 'approved' FOR UPDATE"
-            );
-            $lock->execute([$referral['assigned_counselor_id'], $date, $time]);
-            if ($lock->fetch()) {
-                throw new RuntimeException('The counselor already has an approved appointment at that time. Choose another slot.');
+            // Guard against double-booking the counselor for this slot (approved-only rule) —
+            // only matters when this record is itself taking an approved, calendar-holding slot.
+            if ($status === 'approved') {
+                $lock = $db->prepare(
+                    "SELECT id FROM appointments WHERE counselor_id = ? AND appointment_date = ? AND appointment_time = ?
+                     AND status = 'approved' FOR UPDATE"
+                );
+                $lock->execute([$referral['assigned_counselor_id'], $date, $time]);
+                if ($lock->fetch()) {
+                    throw new RuntimeException('The counselor already has an approved appointment at that time. Choose another slot.');
+                }
             }
 
             $notes = 'Scheduled from Guidance Referral ' . $referral['referral_no'] . '.';
             $stmt = $db->prepare(
                 "INSERT INTO appointments
                  (student_id, counselor_id, type, appointment_date, appointment_time, status, is_confidential, notes)
-                 VALUES (?, ?, 'online', ?, ?, 'approved', 1, ?)"
+                 VALUES (?, ?, ?, ?, ?, ?, 1, ?)"
             );
-            $stmt->execute([$referral['student_id'], $referral['assigned_counselor_id'], $date, $time, $notes]);
+            $stmt->execute([$referral['student_id'], $referral['assigned_counselor_id'], $type, $date, $time, $status, $notes]);
             $appointmentId = (int)$db->lastInsertId();
 
             $log = $db->prepare(
                 "INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks)
-                 VALUES (?, NULL, 'approved', ?, ?)"
+                 VALUES (?, NULL, ?, ?, ?)"
             );
-            $log->execute([$appointmentId, $scheduledBy, 'Created from referral ' . $referral['referral_no']]);
+            $log->execute([$appointmentId, $status, $scheduledBy, 'Created from referral ' . $referral['referral_no']]);
 
             Referral::linkAppointment((int)$referral['id'], $appointmentId);
 
@@ -108,9 +120,10 @@ class ReferralService
         // treated as a failure to schedule the appointment itself, so they're isolated
         // from the transaction above and simply logged if something goes wrong.
         try {
+            $statusPhrase = $status === 'completed' ? 'recorded' : 'scheduled';
             Notification::create(
                 (int)$referral['student_id'],
-                "A guidance appointment was scheduled for you on {$date} at " . date('g:i A', strtotime($time)) . ' following a referral.',
+                "A guidance appointment was {$statusPhrase} for you on {$date} at " . date('g:i A', strtotime($time)) . ' following a referral.',
                 $appointmentId
             );
 
@@ -121,7 +134,9 @@ class ReferralService
                 'appointment_date' => $date,
                 'appointment_time' => $time,
             ];
-            GoogleSyncService::pushCreate($fullAppointment);
+            if ($status === 'approved') {
+                GoogleSyncService::pushCreate($fullAppointment);
+            }
 
             // Other students who preferred this exact same date/time in their own referral
             // couldn't get it — let them know so they're not left guessing. Their referral

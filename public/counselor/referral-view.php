@@ -51,10 +51,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::validate($_POST['csrf_token']
         } else {
             try {
                 ReferralService::convertToAppointment(
-                    Referral::findById($id),
+                    $referral,
                     $apptDate,
                     $apptTime,
-                    $user['id']
+                    $user['id'],
+                    $referral['submitted_via'] ?? 'online'
                 );
                 $_SESSION['flash'] = ['type' => 'success', 'message' => 'Appointment scheduled from this referral.'];
                 header('Location: appointments.php');

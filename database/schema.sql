@@ -236,6 +236,7 @@ CREATE TABLE `referrals` (
   `section_course_program` varchar(150) DEFAULT NULL,
   `sex` varchar(20) DEFAULT NULL,
   `student_contact` varchar(150) DEFAULT NULL,
+  `submitted_via` enum('online','walk-in') NOT NULL DEFAULT 'online',
   `preferred_type` enum('walk-in','online') DEFAULT NULL,
   `preferred_counselor_id` int(11) DEFAULT NULL,
   `preferred_date` date DEFAULT NULL,
