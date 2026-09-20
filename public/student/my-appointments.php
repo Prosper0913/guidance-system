@@ -24,6 +24,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_id'])) {
     exit;
 }
 
+// Handle confirming or declining a counselor-proposed reschedule
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['confirm_reschedule_id']) || isset($_POST['decline_reschedule_id']))) {
+    require_once __DIR__ . '/../../src/Models/Notification.php';
+    if (Csrf::validate($_POST['csrf_token'] ?? null)) {
+        try {
+            if (isset($_POST['confirm_reschedule_id'])) {
+                $updated = Appointment::confirmReschedule((int)$_POST['confirm_reschedule_id'], (int)$user['id']);
+                Notification::create(
+                    (int)$updated['counselor_id'],
+                    "{$user['first_name']} {$user['last_name']} confirmed the new appointment time: {$updated['appointment_date']} at " . date('g:i A', strtotime($updated['appointment_time'])) . '.',
+                    (int)$updated['id']
+                );
+                GoogleSyncService::pushUpdate($updated);
+                $_SESSION['flash'] = ['type' => 'success', 'message' => 'New time confirmed.'];
+            } else {
+                $updated = Appointment::rejectReschedule((int)$_POST['decline_reschedule_id'], (int)$user['id']);
+                Notification::create(
+                    (int)$updated['counselor_id'],
+                    "{$user['first_name']} {$user['last_name']} did not confirm the proposed new time — the appointment has been cancelled.",
+                    (int)$updated['id']
+                );
+                GoogleSyncService::pushDelete($updated);
+                $_SESSION['flash'] = ['type' => 'success', 'message' => 'Appointment cancelled.'];
+            }
+        } catch (RuntimeException $e) {
+            $_SESSION['flash'] = ['type' => 'danger', 'message' => $e->getMessage()];
+        }
+    }
+    header('Location: ' . BASE_URL . '/student/my-appointments.php?tab=appointments');
+    exit;
+}
+
 $tab = ($_GET['tab'] ?? 'appointments') === 'referrals' ? 'referrals' : 'appointments';
 
 $appointments = $tab === 'appointments' ? Appointment::forStudent($user['id']) : [];
@@ -81,9 +113,13 @@ include __DIR__ . '/../partials/flash.php';
               <td><?= htmlspecialchars($a['category_name'] ?? '—') ?></td>
               <td><?= ucfirst($a['type']) ?></td>
               <td>
-                <span class="badge badge-status-<?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span>
-                <?php if (!empty($a['rescheduled_at'])): ?>
-                  <span class="badge bg-warning text-dark" title="Your counselor moved this appointment on <?= date('M j, Y g:i A', strtotime($a['rescheduled_at'])) ?>">Rescheduled</span>
+                <?php if ($a['status'] === 'rescheduled'): ?>
+                  <span class="badge bg-warning text-dark">Awaiting Your Confirmation</span>
+                <?php else: ?>
+                  <span class="badge badge-status-<?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span>
+                  <?php if (!empty($a['rescheduled_at'])): ?>
+                    <span class="badge bg-warning text-dark" title="Your counselor moved this appointment on <?= date('M j, Y g:i A', strtotime($a['rescheduled_at'])) ?>">Rescheduled</span>
+                  <?php endif; ?>
                 <?php endif; ?>
               </td>
               <td>
@@ -101,6 +137,28 @@ include __DIR__ . '/../partials/flash.php';
                 <?php endif; ?>
               </td>
             </tr>
+            <?php if ($a['status'] === 'rescheduled'): ?>
+              <tr>
+                <td colspan="7" class="bg-warning-subtle">
+                  <strong>Your counselor proposed a new time:</strong>
+                  <?= htmlspecialchars($a['proposed_date']) ?> at <?= date('g:i A', strtotime($a['proposed_time'])) ?>.
+                  Your original slot (<?= htmlspecialchars($a['appointment_date']) ?> at <?= date('g:i A', strtotime($a['appointment_time'])) ?>) no longer holds — please confirm or decline below.
+                  If you don't confirm, this appointment will be cancelled.
+                  <div class="mt-2 d-flex gap-2">
+                    <form method="post" onsubmit="return confirm('Confirm this new appointment time?');">
+                      <?= Csrf::field() ?>
+                      <input type="hidden" name="confirm_reschedule_id" value="<?= $a['id'] ?>">
+                      <button class="btn btn-sm btn-success" type="submit">Confirm New Time</button>
+                    </form>
+                    <form method="post" onsubmit="return confirm('Decline this new time? Your appointment will be cancelled.');">
+                      <?= Csrf::field() ?>
+                      <input type="hidden" name="decline_reschedule_id" value="<?= $a['id'] ?>">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Decline & Cancel</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <?php endif; ?>
             <?php if ($notesForThis): ?>
               <tr class="collapse" id="notes-<?= $a['id'] ?>">
                 <td colspan="7" class="bg-light">

@@ -34,6 +34,8 @@ CREATE TABLE `appointments` (
   `appointment_date` date NOT NULL,
   `appointment_time` time NOT NULL,
   `rescheduled_at` datetime DEFAULT NULL,
+  `proposed_date` date DEFAULT NULL,
+  `proposed_time` time DEFAULT NULL,
   `status` enum('pending','approved','declined','completed','cancelled','rescheduled','no-show') NOT NULL DEFAULT 'pending',
   `is_confidential` tinyint(1) NOT NULL DEFAULT 0,
   `notes` text DEFAULT NULL,

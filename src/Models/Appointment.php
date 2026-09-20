@@ -90,7 +90,14 @@ class Appointment
     // is the one making the change, so it doesn't need re-approval). Returns the appointment
     // row (with the new date/time already applied) so the caller can notify the student and
     // push the update to Google Calendar without a second lookup.
-    public static function reschedule(int $id, string $newDate, string $newTime, int $changedBy, ?string $remarks = null): array
+    /**
+     * A counselor proposing a new time no longer applies immediately — it parks the
+     * appointment in a 'rescheduled' (awaiting confirmation) state with the proposed date/time
+     * held separately, so the original slot is preserved until the student responds via
+     * confirmReschedule() or rejectReschedule(). Can be called again while still pending, so a
+     * counselor can correct their own proposal before the student acts on it.
+     */
+    public static function proposeReschedule(int $id, string $newDate, string $newTime, int $changedBy, ?string $remarks = null): array
     {
         $db = Database::getConnection();
         $db->beginTransaction();
@@ -100,6 +107,9 @@ class Appointment
             $appt = $stmt->fetch();
             if (!$appt) {
                 throw new RuntimeException('Appointment not found.');
+            }
+            if (!in_array($appt['status'], ['approved', 'rescheduled'], true)) {
+                throw new RuntimeException('Only approved appointments can be rescheduled.');
             }
 
             $check = $db->prepare(
@@ -111,25 +121,117 @@ class Appointment
                 throw new RuntimeException('That time is already booked by another approved appointment.');
             }
 
-            $upd = $db->prepare('UPDATE appointments SET appointment_date = ?, appointment_time = ?, rescheduled_at = NOW() WHERE id = ?');
+            $upd = $db->prepare(
+                "UPDATE appointments SET status = 'rescheduled', proposed_date = ?, proposed_time = ?, rescheduled_at = NOW() WHERE id = ?"
+            );
             $upd->execute([$newDate, $newTime, $id]);
 
-            $note = $remarks ?: "Rescheduled from {$appt['appointment_date']} {$appt['appointment_time']} to {$newDate} {$newTime}";
+            $note = $remarks ?: "Proposed moving from {$appt['appointment_date']} {$appt['appointment_time']} to {$newDate} {$newTime}; awaiting student confirmation.";
             $log = $db->prepare(
                 'INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks)
                  VALUES (?, ?, ?, ?, ?)'
             );
-            $log->execute([$id, $appt['status'], $appt['status'], $changedBy, $note]);
+            $log->execute([$id, $appt['status'], 'rescheduled', $changedBy, $note]);
 
             $db->commit();
-
-            $appt['appointment_date'] = $newDate;
-            $appt['appointment_time'] = $newTime;
-            return $appt;
         } catch (Exception $e) {
             $db->rollBack();
             throw $e;
         }
+        return self::findById($id);
+    }
+
+    /**
+     * Student accepts the counselor's proposed new time: the proposal becomes the real
+     * appointment_date/time, status returns to 'approved', and the proposal fields are cleared.
+     */
+    public static function confirmReschedule(int $id, int $studentId): array
+    {
+        $db = Database::getConnection();
+        $db->beginTransaction();
+        try {
+            $stmt = $db->prepare('SELECT * FROM appointments WHERE id = ? FOR UPDATE');
+            $stmt->execute([$id]);
+            $appt = $stmt->fetch();
+            if (!$appt) {
+                throw new RuntimeException('Appointment not found.');
+            }
+            if ((int)$appt['student_id'] !== $studentId) {
+                throw new RuntimeException('Not authorized for this appointment.');
+            }
+            if ($appt['status'] !== 'rescheduled' || !$appt['proposed_date'] || !$appt['proposed_time']) {
+                throw new RuntimeException('There is no pending reschedule to confirm.');
+            }
+
+            // Re-check the slot is still free — another appointment could have taken it
+            // in the time between the counselor's proposal and the student's confirmation.
+            $check = $db->prepare(
+                "SELECT id FROM appointments WHERE counselor_id = ? AND appointment_date = ? AND appointment_time = ?
+                 AND status = 'approved' AND id != ? FOR UPDATE"
+            );
+            $check->execute([$appt['counselor_id'], $appt['proposed_date'], $appt['proposed_time'], $id]);
+            if ($check->fetch()) {
+                throw new RuntimeException('That time slot was taken in the meantime. Please contact the Guidance Office to arrange a new time.');
+            }
+
+            $upd = $db->prepare(
+                "UPDATE appointments SET appointment_date = proposed_date, appointment_time = proposed_time,
+                 status = 'approved', proposed_date = NULL, proposed_time = NULL WHERE id = ?"
+            );
+            $upd->execute([$id]);
+
+            $log = $db->prepare(
+                'INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks) VALUES (?, ?, ?, ?, ?)'
+            );
+            $log->execute([$id, 'rescheduled', 'approved', $studentId, 'Student confirmed the new time.']);
+
+            $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+        return self::findById($id);
+    }
+
+    /**
+     * Student declines the proposed new time (or simply doesn't confirm it) — since the
+     * original slot can no longer be assumed to still be free/intended, the appointment is
+     * cancelled outright rather than silently reverting to the old time.
+     */
+    public static function rejectReschedule(int $id, int $studentId): array
+    {
+        $db = Database::getConnection();
+        $db->beginTransaction();
+        try {
+            $stmt = $db->prepare('SELECT * FROM appointments WHERE id = ? FOR UPDATE');
+            $stmt->execute([$id]);
+            $appt = $stmt->fetch();
+            if (!$appt) {
+                throw new RuntimeException('Appointment not found.');
+            }
+            if ((int)$appt['student_id'] !== $studentId) {
+                throw new RuntimeException('Not authorized for this appointment.');
+            }
+            if ($appt['status'] !== 'rescheduled') {
+                throw new RuntimeException('There is no pending reschedule to respond to.');
+            }
+
+            $upd = $db->prepare(
+                "UPDATE appointments SET status = 'cancelled', proposed_date = NULL, proposed_time = NULL WHERE id = ?"
+            );
+            $upd->execute([$id]);
+
+            $log = $db->prepare(
+                'INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks) VALUES (?, ?, ?, ?, ?)'
+            );
+            $log->execute([$id, 'rescheduled', 'cancelled', $studentId, 'Student did not confirm the proposed new time; appointment cancelled.']);
+
+            $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+        return self::findById($id);
     }
 
     /**

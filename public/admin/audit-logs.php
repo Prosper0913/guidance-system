@@ -36,6 +36,10 @@ include __DIR__ . '/../partials/header.php';
   <li class="nav-item"><a class="nav-link <?= $tab === 'appointments' ? 'active' : '' ?>" href="?tab=appointments">Appointment Status Changes</a></li>
 </ul>
 
+<div class="mb-3">
+  <a class="btn btn-sm btn-outline-primary" href="export-audit-logs.php?tab=<?= $tab ?>">⬇ Export <?= $tab === 'logins' ? 'Login Activity' : 'Appointment Logs' ?> (CSV)</a>
+</div>
+
 <?php if ($tab === 'logins'): ?>
 <div class="card">
   <div class="card-body">

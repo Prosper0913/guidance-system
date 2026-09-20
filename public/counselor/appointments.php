@@ -57,8 +57,8 @@ include __DIR__ . '/../partials/flash.php';
     <div class="mb-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
       <div>
         <a class="btn btn-sm <?= $filter === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments">All</a>
-        <?php foreach (['pending','approved','completed','declined','cancelled','no-show'] as $s): ?>
-          <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments&status=<?= $s ?>"><?= ucfirst($s) ?></a>
+        <?php foreach (['pending','approved','rescheduled','completed','declined','cancelled','no-show'] as $s): ?>
+          <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments&status=<?= $s ?>"><?= $s === 'rescheduled' ? 'Awaiting Confirmation' : ucfirst($s) ?></a>
         <?php endforeach; ?>
       </div>
       <a class="btn btn-sm btn-outline-dark" href="record-walkin.php">+ Record Walk-in Appointment</a>
@@ -82,7 +82,7 @@ include __DIR__ . '/../partials/flash.php';
                 <td><?= ucfirst($a['type']) ?></td>
                 <td><?= htmlspecialchars($a['category_name'] ?? '—') ?><?= $a['is_confidential'] ? ' 🔒' : '' ?></td>
                 <td>
-                  <span class="badge badge-status-<?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span>
+                  <span class="badge badge-status-<?= $a['status'] ?>"><?= $a['status'] === 'rescheduled' ? 'Awaiting Student Confirmation' : ucfirst($a['status']) ?></span>
                   <?php if ($a['status'] === 'pending' && (int)$a['other_pending_count'] > 0): ?>
                     <span class="badge bg-warning text-dark ms-1" title="Other students are also pending for this exact time">⚠ +<?= (int)$a['other_pending_count'] ?> other request<?= $a['other_pending_count'] > 1 ? 's' : '' ?> for this slot</span>
                   <?php endif; ?>
@@ -97,6 +97,12 @@ include __DIR__ . '/../partials/flash.php';
                     <button class="btn btn-sm btn-outline-secondary" onclick="setStatus(<?= $a['id'] ?>,'no-show')">No-show</button>
                     <button class="btn btn-sm btn-outline-dark" onclick="openRescheduleModal(<?= $a['id'] ?>, '<?= htmlspecialchars($a['appointment_date']) ?>')">Reschedule</button>
                     <button class="btn btn-sm btn-outline-danger" onclick="setStatus(<?= $a['id'] ?>,'cancelled')">Cancel</button>
+                  <?php elseif ($a['status'] === 'rescheduled'): ?>
+                    <div class="small text-muted mb-1">
+                      Proposed: <?= htmlspecialchars($a['proposed_date']) ?> at <?= date('g:i A', strtotime($a['proposed_time'])) ?> — waiting on the student.
+                    </div>
+                    <button class="btn btn-sm btn-outline-dark" onclick="openRescheduleModal(<?= $a['id'] ?>, '<?= htmlspecialchars($a['proposed_date']) ?>')">Change Proposed Time</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="setStatus(<?= $a['id'] ?>,'cancelled')">Withdraw & Cancel</button>
                   <?php else: ?>
                     <a href="session-notes.php?appointment_id=<?= $a['id'] ?>" class="btn btn-sm btn-outline-dark">Notes</a>
                   <?php endif; ?>
@@ -174,6 +180,7 @@ include __DIR__ . '/../partials/flash.php';
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
+        <p class="text-muted small">This won't move the appointment right away — the student will need to confirm the new time. If they decline or don't respond, the appointment will be cancelled.</p>
         <div class="mb-3">
           <label class="form-label">New Date</label>
           <input type="date" id="rescheduleDate" class="form-control" min="<?= date('Y-m-d') ?>">
@@ -187,7 +194,7 @@ include __DIR__ . '/../partials/flash.php';
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="confirmRescheduleBtn">Confirm New Time</button>
+        <button type="button" class="btn btn-primary" id="confirmRescheduleBtn">Propose New Time</button>
       </div>
     </div>
   </div>
@@ -270,6 +277,7 @@ if (confirmRescheduleBtn) {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
+          alert('New time proposed. The student needs to confirm it before it takes effect.');
           location.reload();
         } else {
           errorEl.textContent = data.message || 'Unable to reschedule.';

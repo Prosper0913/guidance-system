@@ -4,7 +4,6 @@ require_once __DIR__ . '/../../src/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../../src/Helpers/Csrf.php';
 require_once __DIR__ . '/../../src/Models/Appointment.php';
 require_once __DIR__ . '/../../src/Models/Notification.php';
-require_once __DIR__ . '/../../src/Services/GoogleSyncService.php';
 
 header('Content-Type: application/json');
 $user = AuthMiddleware::requireRole([ROLE_COUNSELOR, ROLE_ADMIN]);
@@ -42,27 +41,23 @@ if ($user['role'] === ROLE_COUNSELOR && (int)$existing['counselor_id'] !== (int)
 }
 
 try {
-    $updated = Appointment::reschedule($id, $newDate, $newTime, $user['id']);
+    // This only PROPOSES the new time — it does not move the appointment yet.
+    // The student must confirm it from their My Appointments page before it
+    // takes effect; declining (or not responding) cancels the appointment
+    // instead of quietly keeping the old time.
+    $updated = Appointment::proposeReschedule($id, $newDate, $newTime, $user['id']);
 } catch (RuntimeException $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     exit;
 }
 
-// Merge in the display fields findById() already had (student/counselor names, category)
-// since reschedule() only returns the raw appointments row.
-$full = array_merge($existing, $updated);
-
 Notification::create(
-    (int)$full['student_id'],
-    "Your counselor rescheduled your appointment to {$newDate} at " . date('g:i A', strtotime($newTime)) . '.',
+    (int)$updated['student_id'],
+    "Your counselor proposed moving your appointment to {$newDate} at " . date('g:i A', strtotime($newTime)) . '. Please confirm or decline it in My Appointments — if you don\'t respond, this appointment will be cancelled.',
     $id
 );
 
-if (!empty($full['google_event_id'])) {
-    GoogleSyncService::pushUpdate($full);
-} else {
-    // No prior synced event (e.g. was approved before Google was connected) — create one now.
-    GoogleSyncService::pushCreate($full);
-}
+// No Google Calendar sync yet — the appointment hasn't actually moved until the
+// student confirms. GoogleSyncService::pushUpdate() only runs once that happens.
 
-echo json_encode(['success' => true, 'appointment' => $full]);
+echo json_encode(['success' => true, 'appointment' => $updated]);
