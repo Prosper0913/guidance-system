@@ -95,7 +95,11 @@ CREATE TABLE `audit_logs` (
   `table_affected` varchar(100) DEFAULT NULL,
   `record_id` int(11) DEFAULT NULL,
   `details` varchar(255) DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  KEY `idx_audit_logs_created` (`created_at`),
+  KEY `idx_audit_logs_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------

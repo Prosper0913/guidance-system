@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../src/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../src/Models/User.php';
+require_once __DIR__ . '/../src/Models/AuditLog.php';
 require_once __DIR__ . '/../src/Helpers/Csrf.php';
 require_once __DIR__ . '/../src/Helpers/Validator.php';
 
@@ -40,7 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = User::authenticate($email, $password);
             if (!$user) {
                 $errors[] = 'Invalid credentials, or your account is disabled.';
+                AuditLog::recordLogin(null, $email, null, false);
             } else {
+                AuditLog::recordLogin((int)$user['id'], $email, $user['role'], true);
                 AuthMiddleware::login($user);
 
                 // Check if student needs to set education level
