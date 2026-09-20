@@ -108,7 +108,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!$hasAnyConcern) $errors[] = 'Please select or specify at least one concern in Section III.';
         if (empty($_POST['sex'])) $errors[] = 'Please select your sex in Section I.';
-        if (empty($_POST['preferred_date'])) $errors[] = 'Please select a preferred date.';
+        if (empty($_POST['preferred_date'])) {
+            $errors[] = 'Please select a preferred date.';
+        } elseif (in_array(date('N', strtotime($_POST['preferred_date'])), [6, 7], true)) {
+            $errors[] = 'The Guidance Office is closed on weekends — please choose a weekday (Monday–Friday).';
+        }
         if (empty($_POST['preferred_time'])) $errors[] = 'Please select an available time slot.';
         if (empty($_POST['consent_certified'])) $errors[] = 'You must certify the information and accept the confidentiality terms in Section VII.';
 
@@ -323,6 +327,7 @@ $contact = $user['contact_number'] ?? $user['email'];
           <div class="col-md-4">
             <label class="form-label">Preferred Date <span class="text-danger">*</span></label>
             <input type="date" name="preferred_date" id="prefDate" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>" required>
+            <div id="prefDateWeekendError" class="text-danger small mt-1 d-none">The Guidance Office is closed on weekends — please pick a weekday (Monday–Friday).</div>
           </div>
           <div class="col-md-8">
             <label class="form-label">Available Time Slots <span class="text-danger">*</span></label>
@@ -332,9 +337,24 @@ $contact = $user['contact_number'] ?? $user['email'];
           </div>
         </div>
         <script>
+          function rejectWeekend(input, errorId, onValid) {
+            const d = new Date(input.value + 'T00:00:00');
+            const day = d.getDay(); // 0 = Sunday, 6 = Saturday
+            const errorEl = document.getElementById(errorId);
+            if (input.value && (day === 0 || day === 6)) {
+              input.value = '';
+              if (errorEl) errorEl.classList.remove('d-none');
+              return;
+            }
+            if (errorEl) errorEl.classList.add('d-none');
+            if (onValid) onValid();
+          }
+
           const prefDateInput = document.getElementById('prefDate');
           prefDateInput.addEventListener('change', function () {
-            loadAvailableSlots(<?= (int)$soleCounselor['id'] ?>, this.value, 'prefSlots', 'prefTime');
+            rejectWeekend(this, 'prefDateWeekendError', () => {
+              loadAvailableSlots(<?= (int)$soleCounselor['id'] ?>, this.value, 'prefSlots', 'prefTime');
+            });
           });
           if (prefDateInput.value) {
             loadAvailableSlots(<?= (int)$soleCounselor['id'] ?>, prefDateInput.value, 'prefSlots', 'prefTime');
@@ -345,13 +365,19 @@ $contact = $user['contact_number'] ?? $user['email'];
         <div class="row g-3 mb-4">
           <div class="col-md-4">
             <label class="form-label">Preferred Date <span class="text-danger">*</span></label>
-            <input type="date" name="preferred_date" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>" required>
+            <input type="date" name="preferred_date" id="prefDateFallback" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['preferred_date'] ?? '') ?>" required>
+            <div id="prefDateFallbackWeekendError" class="text-danger small mt-1 d-none">The Guidance Office is closed on weekends — please pick a weekday (Monday–Friday).</div>
           </div>
           <div class="col-md-4">
             <label class="form-label">Preferred Time <span class="text-danger">*</span></label>
             <input type="time" name="preferred_time" class="form-control" value="<?= htmlspecialchars($old['preferred_time'] ?? '') ?>" required>
           </div>
         </div>
+        <script>
+          document.getElementById('prefDateFallback').addEventListener('change', function () {
+            rejectWeekend(this, 'prefDateFallbackWeekendError');
+          });
+        </script>
       <?php endif; ?>
 
       <h5 class="mt-4">VII. Consent and Acknowledgement</h5>

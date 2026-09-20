@@ -54,7 +54,7 @@ $full = array_merge($existing, $updated);
 
 Notification::create(
     (int)$full['student_id'],
-    "Your guidance appointment was rescheduled to {$newDate} at " . date('g:i A', strtotime($newTime)) . '.',
+    "Your counselor rescheduled your appointment to {$newDate} at " . date('g:i A', strtotime($newTime)) . '.',
     $id
 );
 

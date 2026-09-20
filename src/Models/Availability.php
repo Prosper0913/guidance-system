@@ -82,6 +82,13 @@ class Availability
     {
         $dayOfWeek = (int)date('w', strtotime($date));
 
+        // The Guidance Office is permanently closed Saturdays (6) and Sundays (0), regardless
+        // of what a counselor has configured in their weekly availability — this is a fixed
+        // policy, not a per-counselor setting.
+        if (in_array($dayOfWeek, [0, 6], true)) {
+            return [];
+        }
+
         $exception = self::getExceptionForDate($counselorId, $date);
         if ($exception && !$exception['is_available']) {
             return []; // counselor blocked this date entirely

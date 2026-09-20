@@ -80,7 +80,12 @@ include __DIR__ . '/../partials/flash.php';
               <td><?= htmlspecialchars($a['counselor_first'] . ' ' . $a['counselor_last']) ?></td>
               <td><?= htmlspecialchars($a['category_name'] ?? '—') ?></td>
               <td><?= ucfirst($a['type']) ?></td>
-              <td><span class="badge badge-status-<?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span></td>
+              <td>
+                <span class="badge badge-status-<?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span>
+                <?php if (!empty($a['rescheduled_at'])): ?>
+                  <span class="badge bg-warning text-dark" title="Your counselor moved this appointment on <?= date('M j, Y g:i A', strtotime($a['rescheduled_at'])) ?>">Rescheduled</span>
+                <?php endif; ?>
+              </td>
               <td>
                 <?php if (in_array($a['status'], ['pending', 'approved'])): ?>
                   <form method="post" onsubmit="return confirm('Cancel this appointment?');">

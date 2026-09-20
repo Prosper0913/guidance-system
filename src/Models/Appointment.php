@@ -54,7 +54,7 @@ class Appointment
             $sql .= " AND a.status = ?";
             $params[] = $status;
         }
-        $sql .= " ORDER BY a.appointment_date ASC, a.appointment_time ASC";
+        $sql .= " ORDER BY a.updated_at DESC, a.created_at DESC";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
@@ -111,7 +111,7 @@ class Appointment
                 throw new RuntimeException('That time is already booked by another approved appointment.');
             }
 
-            $upd = $db->prepare('UPDATE appointments SET appointment_date = ?, appointment_time = ? WHERE id = ?');
+            $upd = $db->prepare('UPDATE appointments SET appointment_date = ?, appointment_time = ?, rescheduled_at = NOW() WHERE id = ?');
             $upd->execute([$newDate, $newTime, $id]);
 
             $note = $remarks ?: "Rescheduled from {$appt['appointment_date']} {$appt['appointment_time']} to {$newDate} {$newTime}";
