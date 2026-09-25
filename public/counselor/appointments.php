@@ -86,6 +86,9 @@ include __DIR__ . '/../partials/flash.php';
                   <?php if ($a['status'] === 'pending' && (int)$a['other_pending_count'] > 0): ?>
                     <span class="badge bg-warning text-dark ms-1" title="Other students are also pending for this exact time">⚠ +<?= (int)$a['other_pending_count'] ?> other request<?= $a['other_pending_count'] > 1 ? 's' : '' ?> for this slot</span>
                   <?php endif; ?>
+                  <?php if ($a['status'] === 'cancelled' && !empty($a['cancellation_reason'])): ?>
+                    <div class="small text-muted mt-1">Reason: <?= htmlspecialchars($a['cancellation_reason']) ?></div>
+                  <?php endif; ?>
                 </td>
                 <td>
                   <?php if ($a['status'] === 'pending'): ?>
@@ -205,7 +208,13 @@ window.BASE_URL = '<?= BASE_URL ?>';
 const CSRF = '<?= Csrf::token() ?>';
 const CURRENT_COUNSELOR_ID = <?= (int)$user['id'] ?>;
 function setStatus(id, status) {
-  const remarks = (status === 'declined' || status === 'cancelled') ? (prompt('Optional reason:') || '') : '';
+  let remarks = '';
+  if (status === 'cancelled') {
+    remarks = prompt('Reason for cancelling this appointment (the student will see this):') || '';
+    if (!remarks.trim()) { alert('Please provide a reason for the cancellation.'); return; }
+  } else if (status === 'declined') {
+    remarks = prompt('Optional reason:') || '';
+  }
   const fd = new FormData();
   fd.append('csrf_token', CSRF);
   fd.append('appointment_id', id);

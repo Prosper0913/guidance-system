@@ -56,7 +56,8 @@ try {
             // Siblings were never approved, so they never had a synced Google event — nothing to delete.
         }
     } else {
-        Appointment::updateStatus($appointmentId, $newStatus, $user['id'], $remarks ?: null);
+        $cancellationReason = $newStatus === STATUS_CANCELLED ? ($remarks ?: null) : null;
+        Appointment::updateStatus($appointmentId, $newStatus, $user['id'], $remarks ?: null, $cancellationReason);
         NotificationService::statusChanged($appointment, $newStatus, $remarks ?: null);
 
         if (in_array($newStatus, [STATUS_DECLINED, STATUS_CANCELLED, STATUS_NOSHOW], true)) {

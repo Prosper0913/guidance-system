@@ -15,16 +15,15 @@ class User
     public static function findByLogin(string $login): ?array
     {
         $db = Database::getConnection();
-        // Match by email OR username — CMS-pushed students have
-        // username set but email NULL, so they log in with username.
-        // Legacy admin/counselor accounts have email set but username
-        // NULL, so they continue to log in with email.
+        // Match by ID number, email, or username — students log in with their
+        // Student ID (id_number); legacy admin/counselor accounts still use
+        // email; CMS-pushed students may have username set instead.
         $stmt = $db->prepare(
             'SELECT * FROM users 
-             WHERE email = ? OR username = ? 
+             WHERE id_number = ? OR email = ? OR username = ? 
              LIMIT 1'
         );
-        $stmt->execute([$login, $login]);
+        $stmt->execute([$login, $login, $login]);
         $row = $stmt->fetch();
         return $row ?: null;
     }

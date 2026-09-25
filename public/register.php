@@ -44,12 +44,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $course = in_array($_POST['course'] ?? '', $courses, true) ? $_POST['course'] : '';
         }
 
+        // Year level options depend on education level too — validated server-side in
+        // case someone bypasses the JS-driven dropdown swap.
+        $yearLevelOptions = [
+            'junior_highschool' => ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'],
+            'senior_highschool' => ['Grade 11', 'Grade 12'],
+            'college' => ['1st Year', '2nd Year', '3rd Year', '4th Year'],
+        ];
+        $allowedYearLevels = $yearLevelOptions[$educationLevel] ?? [];
+        if (!in_array($yearLevel, $allowedYearLevels, true)) {
+            $yearLevel = '';
+        }
+
         if (!Validator::required($idNumber)) $errors[] = 'Student ID number is required.';
         if (!Validator::required($firstName)) $errors[] = 'First name is required.';
         if (!Validator::required($lastName)) $errors[] = 'Last name is required.';
         if (!in_array($educationLevel, ['junior_highschool', 'senior_highschool', 'college'], true)) $errors[] = 'Please select your education level.';
         if ($educationLevel === 'senior_highschool' && !$course) $errors[] = 'Please select your strand.';
         if ($educationLevel === 'college' && !$course) $errors[] = 'Please select your course.';
+        if (!Validator::required($yearLevel)) $errors[] = 'Please select your grade/year level.';
         if (!Validator::email($email)) $errors[] = 'A valid email is required.';
         if (!Validator::minLength($password, 8)) $errors[] = 'Password must be at least 8 characters.';
         if ($password !== $confirm) $errors[] = 'Passwords do not match.';
@@ -140,8 +153,28 @@ include __DIR__ . '/partials/header.php';
         </div>
 
         <div class="col-md-6 mb-3">
-          <label class="form-label">Year Level</label>
-          <input type="text" name="year_level" class="form-control" placeholder="e.g. Grade 8, Grade 11, 2nd Year" value="<?= htmlspecialchars($old['year_level'] ?? '') ?>">
+          <label class="form-label">Year Level <span class="text-danger">*</span></label>
+          <select name="year_level" id="yearLevelJHS" class="form-select year-level-select" style="display:none;">
+            <option value="">-- Select Grade --</option>
+            <?php foreach (['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'] as $g): ?>
+              <option value="<?= $g ?>" <?= ($old['year_level'] ?? '') === $g ? 'selected' : '' ?>><?= $g ?></option>
+            <?php endforeach; ?>
+          </select>
+          <select name="year_level" id="yearLevelSHS" class="form-select year-level-select" style="display:none;">
+            <option value="">-- Select Grade --</option>
+            <?php foreach (['Grade 11', 'Grade 12'] as $g): ?>
+              <option value="<?= $g ?>" <?= ($old['year_level'] ?? '') === $g ? 'selected' : '' ?>><?= $g ?></option>
+            <?php endforeach; ?>
+          </select>
+          <select name="year_level" id="yearLevelCollege" class="form-select year-level-select" style="display:none;">
+            <option value="">-- Select Year --</option>
+            <?php foreach (['1st Year', '2nd Year', '3rd Year', '4th Year'] as $y): ?>
+              <option value="<?= $y ?>" <?= ($old['year_level'] ?? '') === $y ? 'selected' : '' ?>><?= $y ?></option>
+            <?php endforeach; ?>
+          </select>
+          <select class="form-select" disabled id="yearLevelPlaceholder">
+            <option>-- Select education level first --</option>
+          </select>
         </div>
         <div class="col-md-6 mb-3">
           <label class="form-label">Section</label>
@@ -167,6 +200,10 @@ include __DIR__ . '/partials/header.php';
   const eduLevel = document.getElementById('educationLevel');
   const strandField = document.getElementById('strandField');
   const courseField = document.getElementById('courseField');
+  const yearLevelJHS = document.getElementById('yearLevelJHS');
+  const yearLevelSHS = document.getElementById('yearLevelSHS');
+  const yearLevelCollege = document.getElementById('yearLevelCollege');
+  const yearLevelPlaceholder = document.getElementById('yearLevelPlaceholder');
 
   function toggleCourseFields() {
     const level = eduLevel.value;
@@ -174,9 +211,72 @@ include __DIR__ . '/partials/header.php';
     courseField.style.display = level === 'college' ? '' : 'none';
     strandField.querySelector('select').disabled = level !== 'senior_highschool';
     courseField.querySelector('select').disabled = level !== 'college';
+
+    const yearLevelMap = {
+      junior_highschool: yearLevelJHS,
+      senior_highschool: yearLevelSHS,
+      college: yearLevelCollege,
+    };
+    [yearLevelJHS, yearLevelSHS, yearLevelCollege].forEach(sel => {
+      const isActive = yearLevelMap[level] === sel;
+      sel.style.display = isActive ? '' : 'none';
+      sel.disabled = !isActive;
+    });
+    yearLevelPlaceholder.style.display = level ? 'none' : '';
   }
 
   eduLevel.addEventListener('change', toggleCourseFields);
   toggleCourseFields();
+
+  // Live password-match validation — highlights the fields and shows a
+  // dismissible notice instead of round-tripping to the server to say the
+  // same thing.
+  const pwField = document.querySelector('input[name="password"]');
+  const confirmField = document.querySelector('input[name="confirm_password"]');
+  const registerForm = document.getElementById('registerForm');
+  let pwMismatchAlert = null;
+
+  function clearPwMismatch() {
+    pwField.classList.remove('is-invalid');
+    confirmField.classList.remove('is-invalid');
+    if (pwMismatchAlert) {
+      pwMismatchAlert.remove();
+      pwMismatchAlert = null;
+    }
+  }
+
+  function showPwMismatch() {
+    pwField.classList.add('is-invalid');
+    confirmField.classList.add('is-invalid');
+    if (!pwMismatchAlert) {
+      pwMismatchAlert = document.createElement('div');
+      pwMismatchAlert.className = 'alert alert-danger py-2';
+      pwMismatchAlert.textContent = 'Passwords do not match.';
+      registerForm.prepend(pwMismatchAlert);
+    }
+  }
+
+  function checkPasswordsMatch() {
+    if (!pwField.value || !confirmField.value) {
+      clearPwMismatch();
+      return true;
+    }
+    if (pwField.value !== confirmField.value) {
+      showPwMismatch();
+      return false;
+    }
+    clearPwMismatch();
+    return true;
+  }
+
+  pwField.addEventListener('input', checkPasswordsMatch);
+  confirmField.addEventListener('input', checkPasswordsMatch);
+
+  registerForm.addEventListener('submit', function (e) {
+    if (!checkPasswordsMatch()) {
+      e.preventDefault();
+      confirmField.focus();
+    }
+  });
 </script>
 <?php include __DIR__ . '/partials/footer.php'; ?>

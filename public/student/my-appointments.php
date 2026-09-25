@@ -13,9 +13,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_id'])) {
     if (Csrf::validate($_POST['csrf_token'] ?? null)) {
         $appt = Appointment::findById((int)$_POST['cancel_id']);
         if ($appt && (int)$appt['student_id'] === (int)$user['id'] && in_array($appt['status'], ['pending', 'approved'])) {
-            Appointment::updateStatus((int)$appt['id'], STATUS_CANCELLED, $user['id'], 'Cancelled by student');
-            require_once __DIR__ . '/../../src/Services/NotificationService.php';
-            NotificationService::statusChanged($appt, STATUS_CANCELLED);
+            $reason = trim($_POST['cancel_reason'] ?? '');
+            Appointment::updateStatus((int)$appt['id'], STATUS_CANCELLED, $user['id'], 'Cancelled by student. Reason: ' . ($reason ?: 'not given'), $reason ?: null);
+            // The student is the one cancelling, so it's the counselor who needs to be told —
+            // NotificationService::statusChanged() always targets the student, so it's the
+            // wrong tool for a student-initiated action.
+            require_once __DIR__ . '/../../src/Models/Notification.php';
+            Notification::create(
+                (int)$appt['counselor_id'],
+                "{$user['first_name']} {$user['last_name']} cancelled their appointment on {$appt['appointment_date']} at " . date('g:i A', strtotime($appt['appointment_time'])) . '.' . ($reason ? " Reason: {$reason}" : ''),
+                (int)$appt['id']
+            );
             GoogleSyncService::pushDelete($appt);
             $_SESSION['flash'] = ['type' => 'success', 'message' => 'Appointment cancelled.'];
         }
@@ -120,13 +128,17 @@ include __DIR__ . '/../partials/flash.php';
                   <?php if (!empty($a['rescheduled_at'])): ?>
                     <span class="badge bg-warning text-dark" title="Your counselor moved this appointment on <?= date('M j, Y g:i A', strtotime($a['rescheduled_at'])) ?>">Rescheduled</span>
                   <?php endif; ?>
+                  <?php if ($a['status'] === 'cancelled' && !empty($a['cancellation_reason'])): ?>
+                    <div class="small text-muted mt-1">Reason: <?= htmlspecialchars($a['cancellation_reason']) ?></div>
+                  <?php endif; ?>
                 <?php endif; ?>
               </td>
               <td>
                 <?php if (in_array($a['status'], ['pending', 'approved'])): ?>
-                  <form method="post" onsubmit="return confirm('Cancel this appointment?');">
+                  <form method="post" onsubmit="return promptCancelReason(this);">
                     <?= Csrf::field() ?>
                     <input type="hidden" name="cancel_id" value="<?= $a['id'] ?>">
+                    <input type="hidden" name="cancel_reason">
                     <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
                   </form>
                 <?php endif; ?>
@@ -222,4 +234,17 @@ include __DIR__ . '/../partials/flash.php';
   </div>
 
 <?php endif; ?>
+
+<script>
+  function promptCancelReason(form) {
+    const reason = prompt('Reason for cancelling this appointment (your counselor will see this):');
+    if (reason === null) return false; // user hit Cancel on the prompt itself
+    if (!reason.trim()) {
+      alert('Please provide a reason for the cancellation.');
+      return false;
+    }
+    form.querySelector('input[name="cancel_reason"]').value = reason.trim();
+    return true;
+  }
+</script>
 <?php include __DIR__ . '/../partials/footer.php'; ?>

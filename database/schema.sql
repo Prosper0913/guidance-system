@@ -39,6 +39,7 @@ CREATE TABLE `appointments` (
   `status` enum('pending','approved','declined','completed','cancelled','rescheduled','no-show') NOT NULL DEFAULT 'pending',
   `is_confidential` tinyint(1) NOT NULL DEFAULT 0,
   `notes` text DEFAULT NULL,
+  `cancellation_reason` varchar(255) DEFAULT NULL,
   `google_event_id` varchar(255) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()

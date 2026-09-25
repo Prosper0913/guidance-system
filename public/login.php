@@ -102,8 +102,9 @@ include __DIR__ . '/partials/header.php';
     <form method="post" novalidate>
       <?= Csrf::field() ?>
       <div class="mb-3">
-        <label class="form-label">Email or Username</label>
-        <input type="email" name="email" class="form-control" required value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+        <label class="form-label">Student ID / Email</label>
+        <input type="text" name="email" class="form-control" required autofocus value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+        <div class="form-text">Students: use your Student ID number. Counselors/Admins: use your email.</div>
       </div>
       <div class="mb-3">
         <label class="form-label">Password</label>

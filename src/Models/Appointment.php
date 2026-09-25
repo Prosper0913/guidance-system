@@ -60,7 +60,7 @@ class Appointment
         return $stmt->fetchAll();
     }
 
-    public static function updateStatus(int $id, string $newStatus, int $changedBy, ?string $remarks = null): void
+    public static function updateStatus(int $id, string $newStatus, int $changedBy, ?string $remarks = null, ?string $cancellationReason = null): void
     {
         $db = Database::getConnection();
         $db->beginTransaction();
@@ -69,8 +69,13 @@ class Appointment
             $stmt->execute([$id]);
             $current = $stmt->fetchColumn();
 
-            $upd = $db->prepare('UPDATE appointments SET status = ? WHERE id = ?');
-            $upd->execute([$newStatus, $id]);
+            if ($newStatus === STATUS_CANCELLED && $cancellationReason) {
+                $upd = $db->prepare('UPDATE appointments SET status = ?, cancellation_reason = ? WHERE id = ?');
+                $upd->execute([$newStatus, $cancellationReason, $id]);
+            } else {
+                $upd = $db->prepare('UPDATE appointments SET status = ? WHERE id = ?');
+                $upd->execute([$newStatus, $id]);
+            }
 
             $log = $db->prepare(
                 'INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks)
