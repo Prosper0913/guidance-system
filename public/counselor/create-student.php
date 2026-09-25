@@ -1,15 +1,14 @@
 <?php
-require_once __DIR__ . '/../config/constants.php';
-require_once __DIR__ . '/../src/Middleware/AuthMiddleware.php';
-require_once __DIR__ . '/../src/Models/User.php';
-require_once __DIR__ . '/../src/Helpers/Csrf.php';
-require_once __DIR__ . '/../src/Helpers/Validator.php';
+// Public self-registration was removed — counselors are now responsible for creating
+// student accounts. Course/strand input adapts to the selected education level:
+// Junior High has neither, Senior High gets a strand dropdown, College gets a course dropdown.
+require_once __DIR__ . '/../../config/constants.php';
+require_once __DIR__ . '/../../src/Middleware/AuthMiddleware.php';
+require_once __DIR__ . '/../../src/Models/User.php';
+require_once __DIR__ . '/../../src/Helpers/Csrf.php';
+require_once __DIR__ . '/../../src/Helpers/Validator.php';
 
-AuthMiddleware::start();
-if (AuthMiddleware::currentUser()) {
-    header('Location: ' . BASE_URL . '/index.php');
-    exit;
-}
+$user = AuthMiddleware::requireRole([ROLE_COUNSELOR]);
 
 $strands = ['ABM', 'HUMSS', 'STEM', 'TechVoc'];
 $courses = ['BSN', 'BSBA', 'BSA', 'BSIT', 'BEED', 'BSED', 'FPST'];
@@ -21,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $old = $_POST;
 
     if (!Csrf::validate($_POST['csrf_token'] ?? null)) {
-        $errors[] = 'Invalid session token. Please try again.';
+        $errors[] = 'Your session expired. Please resubmit the form.';
     } else {
         $idNumber = Validator::clean($_POST['id_number'] ?? '');
         $firstName = Validator::clean($_POST['first_name'] ?? '');
@@ -47,9 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!Validator::required($idNumber)) $errors[] = 'Student ID number is required.';
         if (!Validator::required($firstName)) $errors[] = 'First name is required.';
         if (!Validator::required($lastName)) $errors[] = 'Last name is required.';
-        if (!in_array($educationLevel, ['junior_highschool', 'senior_highschool', 'college'], true)) $errors[] = 'Please select your education level.';
-        if ($educationLevel === 'senior_highschool' && !$course) $errors[] = 'Please select your strand.';
-        if ($educationLevel === 'college' && !$course) $errors[] = 'Please select your course.';
+        if (!in_array($educationLevel, ['junior_highschool', 'senior_highschool', 'college'], true)) $errors[] = 'Please select the education level.';
+        if ($educationLevel === 'senior_highschool' && !$course) $errors[] = 'Please select a strand.';
+        if ($educationLevel === 'college' && !$course) $errors[] = 'Please select a course.';
         if (!Validator::email($email)) $errors[] = 'A valid email is required.';
         if (!Validator::minLength($password, 8)) $errors[] = 'Password must be at least 8 characters.';
         if ($password !== $confirm) $errors[] = 'Passwords do not match.';
@@ -69,24 +68,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'section' => $section,
                 'password' => $password,
             ]);
-            $_SESSION['flash'] = ['type' => 'success', 'message' => 'Account created! You can now log in.'];
-            header('Location: ' . BASE_URL . '/login.php');
+            $_SESSION['flash'] = ['type' => 'success', 'message' => "Student account created for {$firstName} {$lastName}."];
+            header('Location: create-student.php');
             exit;
         }
     }
 }
 
-$pageTitle = 'Create Account';
-include __DIR__ . '/partials/header.php';
+$pageTitle = 'Create Student Account';
+include __DIR__ . '/../partials/header.php';
+include __DIR__ . '/../partials/flash.php';
 ?>
-<div class="card auth-card" style="max-width: 560px;">
-  <div class="card-header text-center"><h4 class="mb-0"><img src="assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 50px;"> <?= APP_NAME ?></h4></div>
+<div class="card" style="max-width: 640px;">
+  <div class="card-header"><h4 class="mb-0">Create Student Account</h4></div>
   <div class="card-body p-4">
-    <p class="text-center text-muted small mb-3">Student Account Registration</p>
+    <p class="text-muted small">Self-registration has been removed — the Guidance Office creates student accounts directly.</p>
     <?php foreach ($errors as $e): ?>
       <div class="alert alert-danger"><?= htmlspecialchars($e) ?></div>
     <?php endforeach; ?>
-    <form method="post" novalidate id="registerForm">
+    <form method="post" novalidate id="createStudentForm">
       <?= Csrf::field() ?>
       <div class="row">
         <div class="col-md-6 mb-3">
@@ -148,7 +148,7 @@ include __DIR__ . '/partials/header.php';
           <input type="text" name="section" class="form-control" value="<?= htmlspecialchars($old['section'] ?? '') ?>">
         </div>
         <div class="col-md-6 mb-3">
-          <label class="form-label">Password</label>
+          <label class="form-label">Temporary Password</label>
           <input type="password" name="password" class="form-control" required minlength="8">
         </div>
         <div class="col-md-6 mb-3">
@@ -156,11 +156,8 @@ include __DIR__ . '/partials/header.php';
           <input type="password" name="confirm_password" class="form-control" required minlength="8">
         </div>
       </div>
-      <button type="submit" class="btn btn-primary w-100">Create Account</button>
+      <button type="submit" class="btn btn-primary w-100">Create Student Account</button>
     </form>
-    <p class="text-center mt-3 mb-0">
-      Already have an account? <a href="<?= BASE_URL ?>/login.php">Log in</a>
-    </p>
   </div>
 </div>
 <script>
@@ -179,4 +176,4 @@ include __DIR__ . '/partials/header.php';
   eduLevel.addEventListener('change', toggleCourseFields);
   toggleCourseFields();
 </script>
-<?php include __DIR__ . '/partials/footer.php'; ?>
+<?php include __DIR__ . '/../partials/footer.php'; ?>
