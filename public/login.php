@@ -104,7 +104,7 @@ include __DIR__ . '/partials/header.php';
       <div class="mb-3">
         <label class="form-label">Student ID / Email</label>
         <input type="text" name="email" class="form-control" required autofocus value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
-        <div class="form-text">Students: use your Student ID number. Counselors/Admins: use your email.</div>
+        <!-- <div class="form-text">Students: use your Student ID number. Counselors/Admins: use your email.</div> -->
       </div>
       <div class="mb-3">
         <label class="form-label">Password</label>
@@ -112,6 +112,9 @@ include __DIR__ . '/partials/header.php';
       </div>
       <button type="submit" class="btn btn-primary w-100">Log In</button>
     </form>
+    <p class="text-center mt-3 mb-0">
+      New student? <a href="<?= BASE_URL ?>/register.php">Create an account</a>
+    </p>
   </div>
 </div>
 <?php endif; ?>
