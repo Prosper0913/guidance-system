@@ -112,9 +112,6 @@ include __DIR__ . '/partials/header.php';
       </div>
       <button type="submit" class="btn btn-primary w-100">Log In</button>
     </form>
-    <p class="text-center mt-3 mb-0">
-      New student? <a href="<?= BASE_URL ?>/register.php">Create an account</a>
-    </p>
   </div>
 </div>
 <?php endif; ?>
