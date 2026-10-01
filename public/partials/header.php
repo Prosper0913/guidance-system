@@ -47,6 +47,7 @@ $unread = $user ? Notification::unreadCount($user['id']) : 0;
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/dashboard.php">Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/appointments.php">Appointments</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/availability.php">Availability</a></li>
+          <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/record-walkin.php">Record Walk-in Appointment</a></li>
         <?php elseif ($user['role'] === ROLE_ADMIN): ?>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/admin/dashboard.php">Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="<?= BASE_URL ?>/counselor/appointments.php?tab=referrals">Referrals</a></li>
