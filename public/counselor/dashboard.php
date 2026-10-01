@@ -13,6 +13,12 @@ $myReferrals = Referral::forCounselor($user['id']);
 $myPendingReferrals = count(array_filter($myReferrals, fn($r) => $r['status'] === 'pending'));
 $googleConnected = GoogleToken::isConnected($user['id']);
 
+// Walk-in vs online report, filtered by date range (defaults to the current month)
+$reportFrom = $_GET['report_from'] ?? date('Y-m-01');
+$reportTo = $_GET['report_to'] ?? date('Y-m-t');
+$typeCounts = Appointment::typeCountsForCounselor($user['id'], $reportFrom, $reportTo);
+$typeTotal = $typeCounts['walk-in'] + $typeCounts['online'];
+
 $pageTitle = 'Counselor Dashboard';
 include __DIR__ . '/../partials/header.php';
 include __DIR__ . '/../partials/flash.php';
@@ -36,6 +42,43 @@ include __DIR__ . '/../partials/flash.php';
     <h6 class="text-muted">My Pending Referrals</h6><h2><?= $myPendingReferrals ?></h2>
     <a href="appointments.php?tab=referrals" class="btn btn-sm btn-outline-primary mt-2">View My Referrals</a>
   </div></div></div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Appointments Report — Walk-in vs Online</div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end mb-3">
+      <div class="col-auto">
+        <label class="form-label small mb-0">From</label>
+        <input type="date" name="report_from" class="form-control form-control-sm" value="<?= htmlspecialchars($reportFrom) ?>">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0">To</label>
+        <input type="date" name="report_to" class="form-control form-control-sm" value="<?= htmlspecialchars($reportTo) ?>">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        <a href="dashboard.php" class="btn btn-sm btn-outline-secondary">Reset to this month</a>
+      </div>
+    </form>
+    <div class="row text-center">
+      <div class="col-4">
+        <h6 class="text-muted mb-1">Walk-in</h6>
+        <h2 class="mb-0"><?= $typeCounts['walk-in'] ?></h2>
+      </div>
+      <div class="col-4">
+        <h6 class="text-muted mb-1">Online</h6>
+        <h2 class="mb-0"><?= $typeCounts['online'] ?></h2>
+      </div>
+      <div class="col-4">
+        <h6 class="text-muted mb-1">Total</h6>
+        <h2 class="mb-0"><?= $typeTotal ?></h2>
+      </div>
+    </div>
+    <p class="text-muted small text-center mb-0 mt-2">
+      <?= date('M j, Y', strtotime($reportFrom)) ?> – <?= date('M j, Y', strtotime($reportTo)) ?>, your appointments only (by appointment date, every status included)
+    </p>
+  </div>
 </div>
 
 <div class="card mb-4">

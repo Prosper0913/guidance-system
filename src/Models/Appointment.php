@@ -351,6 +351,25 @@ class Appointment
         return $stmt->fetchAll();
     }
 
+    // Walk-in vs online appointment counts for a counselor within a date range
+    // (inclusive on both ends), for the dashboard report. Counts every status —
+    // this is about how appointments came in, not whether they were kept.
+    public static function typeCountsForCounselor(int $counselorId, string $dateFrom, string $dateTo): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT type, COUNT(*) AS total FROM appointments
+             WHERE counselor_id = ? AND appointment_date BETWEEN ? AND ?
+             GROUP BY type"
+        );
+        $stmt->execute([$counselorId, $dateFrom, $dateTo]);
+        $counts = ['walk-in' => 0, 'online' => 0];
+        foreach ($stmt->fetchAll() as $row) {
+            $counts[$row['type']] = (int)$row['total'];
+        }
+        return $counts;
+    }
+
     // Session notes a counselor has explicitly chosen to share with this student,
     // grouped by appointment_id (an appointment can have more than one shared note).
     public static function sharedNotesForStudent(int $studentId): array
