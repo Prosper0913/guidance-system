@@ -60,9 +60,6 @@ include __DIR__ . '/../partials/flash.php';
         <?php foreach (['pending','approved','rescheduled','completed','declined','cancelled','no-show'] as $s): ?>
           <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments&status=<?= $s ?>"><?= $s === 'rescheduled' ? 'Awaiting Confirmation' : ucfirst($s) ?></a>
         <?php endforeach; ?>
-      </div>
-      <a class="btn btn-sm btn-outline-dark" href="record-walkin.php">+ Record Walk-in Appointment</a>
-    </div>
 
     <div class="card">
       <div class="card-body">
