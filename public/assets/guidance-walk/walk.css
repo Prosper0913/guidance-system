@@ -1,0 +1,55 @@
+/* Guidance Office street-view walkthrough — scoped under .gw */
+.gw{position:relative;height:calc(100vh - 140px);min-height:480px;background:#101214;color:#f4f2ec;border-radius:12px;overflow:hidden;
+ font-family:-apple-system,Segoe UI,Roboto,sans-serif;user-select:none;-webkit-tap-highlight-color:transparent}
+.gw *{box-sizing:border-box}
+.gw-view{position:absolute;inset:0;touch-action:none;cursor:grab}
+.gw-view:active{cursor:grabbing}
+.gw canvas{display:block}
+.gw-fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .18s;z-index:2}
+.gw-top{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;z-index:4}
+.gw-pill{background:rgba(16,18,20,.72);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:7px 14px;font-size:13px;white-space:nowrap;backdrop-filter:blur(6px)}
+.gw-pill b{color:#f2b705}
+
+/* "you can look left / right" sign */
+.gw-look{position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:10px;pointer-events:none;
+ background:rgba(16,18,20,.5);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px 14px;font-size:12px;white-space:nowrap;backdrop-filter:blur(4px)}
+.gw-look .t{max-width:240px;overflow:hidden;transition:max-width .5s,opacity .5s;opacity:.95}
+.gw-look .a{font-size:15px;color:rgba(255,255,255,.9);animation:gwNudgeL 1.4s ease-in-out infinite}
+.gw-look .a.r{animation-name:gwNudgeR}
+.gw-look.compact .t{max-width:0;opacity:0}
+.gw-look.compact{gap:14px;background:rgba(16,18,20,.38)}
+@keyframes gwNudgeL{0%,100%{transform:translateX(0)}50%{transform:translateX(-5px)}}
+@keyframes gwNudgeR{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+
+/* side chevrons: tap to turn the view */
+.gw-side{position:absolute;top:50%;transform:translateY(-50%);z-index:4;width:40px;height:64px;border:0;cursor:pointer;color:#fff;
+ background:rgba(255,255,255,.18);backdrop-filter:blur(3px);transition:opacity .25s;font-size:26px;line-height:1;padding:0}
+.gw-side.l{left:0;border-radius:0 32px 32px 0}
+.gw-side.r{right:0;border-radius:32px 0 0 32px}
+.gw-side:hover{background:rgba(255,255,255,.34)}
+
+/* forward / back arrows (slightly transparent, street-view style) */
+.gw-nav{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:6px}
+.gw-arrow{border-radius:50%;border:2px solid rgba(255,255,255,.65);background:rgba(255,255,255,.26);backdrop-filter:blur(4px);cursor:pointer;
+ display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 3px 14px rgba(0,0,0,.35);transition:background .2s,opacity .2s,transform .15s}
+.gw-arrow:hover{background:rgba(255,255,255,.45)}
+.gw-arrow:active{transform:scale(.94)}
+.gw-arrow svg{display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+.gw-arrow.fwd{width:68px;height:68px}
+.gw-arrow.back{width:44px;height:44px}
+.gw-arrow:disabled{opacity:.2;cursor:default;pointer-events:none}
+.gw-lbl{font-size:11px;font-weight:600;letter-spacing:.3px;text-shadow:0 1px 4px rgba(0,0,0,.8);margin-top:-2px}
+
+/* mini map */
+.gw-mini{position:absolute;left:10px;bottom:12px;width:min(26%,170px);min-width:96px;background:#000;border:2px solid rgba(255,255,255,.85);border-radius:10px;
+ overflow:hidden;transition:width .25s;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.5);z-index:6}
+.gw-mini.big{width:min(86%,380px)}
+.gw-mini .stage{position:relative;line-height:0}
+.gw-mini img{width:100%;display:block}
+.gw-mini svg{position:absolute;inset:0;width:100%;height:100%}
+.gw-mini .tag{position:absolute;right:6px;top:6px;font-size:10px;line-height:1;background:rgba(0,0,0,.65);padding:4px 6px;border-radius:6px;pointer-events:none}
+
+.gw-arrive{position:absolute;inset:0;display:none;background:#0b0c0d;z-index:3;align-items:center;justify-content:center;flex-direction:column;padding:56px 14px 120px}
+.gw-arrive img{max-width:100%;min-height:0;object-fit:contain;border-radius:10px}
+.gw-arrive .banner{margin-bottom:10px;background:#2f6b3c;padding:9px 18px;border-radius:999px;font-weight:700;font-size:15px}
+@media (max-width:520px){.gw-pill{font-size:12px;padding:6px 11px}.gw-cap{display:none}.gw-look .t{max-width:170px}}
