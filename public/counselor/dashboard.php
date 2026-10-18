@@ -61,22 +61,34 @@ include __DIR__ . '/../partials/flash.php';
         <a href="dashboard.php" class="btn btn-sm btn-outline-secondary">Reset to this month</a>
       </div>
     </form>
-    <div class="row text-center">
+    <?php
+      $reportQuery = fn(string $type = '') => 'appointments.php?' . http_build_query(array_filter([
+          'tab' => 'appointments', 'from' => $reportFrom, 'to' => $reportTo, 'type' => $type,
+      ]));
+    ?>
+    <div class="row text-center g-2">
       <div class="col-4">
-        <h6 class="text-muted mb-1">Walk-in</h6>
-        <h2 class="mb-0"><?= $typeCounts['walk-in'] ?></h2>
+        <a href="<?= htmlspecialchars($reportQuery('walk-in')) ?>" class="d-block text-decoration-none text-reset border rounded py-2 report-tile">
+          <h6 class="text-muted mb-1">Walk-in</h6>
+          <h2 class="mb-0"><?= $typeCounts['walk-in'] ?></h2>
+        </a>
       </div>
       <div class="col-4">
-        <h6 class="text-muted mb-1">Online</h6>
-        <h2 class="mb-0"><?= $typeCounts['online'] ?></h2>
+        <a href="<?= htmlspecialchars($reportQuery('online')) ?>" class="d-block text-decoration-none text-reset border rounded py-2 report-tile">
+          <h6 class="text-muted mb-1">Online</h6>
+          <h2 class="mb-0"><?= $typeCounts['online'] ?></h2>
+        </a>
       </div>
       <div class="col-4">
-        <h6 class="text-muted mb-1">Total</h6>
-        <h2 class="mb-0"><?= $typeTotal ?></h2>
+        <a href="<?= htmlspecialchars($reportQuery()) ?>" class="d-block text-decoration-none text-reset border rounded py-2 report-tile">
+          <h6 class="text-muted mb-1">Total</h6>
+          <h2 class="mb-0"><?= $typeTotal ?></h2>
+        </a>
       </div>
     </div>
+    <style>.report-tile:hover{background:#f1f5f1;border-color:#4C8C3C !important}</style>
     <p class="text-muted small text-center mb-0 mt-2">
-      <?= date('M j, Y', strtotime($reportFrom)) ?> – <?= date('M j, Y', strtotime($reportTo)) ?>, your appointments only (by appointment date, every status included)
+      <?= date('M j, Y', strtotime($reportFrom)) ?> – <?= date('M j, Y', strtotime($reportTo)) ?>, your appointments only (by appointment date, every status included). Click a number to see those appointments.
     </p>
   </div>
 </div>

@@ -36,10 +36,11 @@ class Appointment
         return $stmt->fetchAll();
     }
 
-    public static function forCounselor(int $counselorId, ?string $status = null): array
+    public static function forCounselor(int $counselorId, ?string $status = null, ?string $dateFrom = null, ?string $dateTo = null, ?string $type = null): array
     {
         $db = Database::getConnection();
         $sql = "SELECT a.*, cc.name AS category_name, s.first_name AS student_first, s.last_name AS student_last,
+                       s.id_number AS student_id_number, sp.course AS student_course,
                        (SELECT COUNT(*) FROM appointments a2
                         WHERE a2.counselor_id = a.counselor_id
                           AND a2.appointment_date = a.appointment_date
@@ -48,11 +49,21 @@ class Appointment
                 FROM appointments a
                 LEFT JOIN concern_categories cc ON cc.id = a.concern_category_id
                 JOIN users s ON s.id = a.student_id
+                LEFT JOIN student_profiles sp ON sp.user_id = s.id
                 WHERE a.counselor_id = ?";
         $params = [$counselorId];
         if ($status) {
             $sql .= " AND a.status = ?";
             $params[] = $status;
+        }
+        if ($dateFrom && $dateTo) {
+            $sql .= " AND a.appointment_date BETWEEN ? AND ?";
+            $params[] = $dateFrom;
+            $params[] = $dateTo;
+        }
+        if ($type) {
+            $sql .= " AND a.type = ?";
+            $params[] = $type;
         }
         $sql .= " ORDER BY a.updated_at DESC, a.created_at DESC";
         $stmt = $db->prepare($sql);

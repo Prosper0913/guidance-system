@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../src/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../../src/Models/User.php';
 require_once __DIR__ . '/../../src/Models/Referral.php';
 require_once __DIR__ . '/../../src/Services/ReferralService.php';
+require_once __DIR__ . '/../../src/Models/Availability.php';
 require_once __DIR__ . '/../../src/Helpers/Csrf.php';
 require_once __DIR__ . '/../../src/Helpers/Validator.php';
 
@@ -58,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $selectedStudent) {
             if (is_string($v) && trim($v) !== '') $hasAnyConcern = true;
         }
         $isSelfReferral = !empty($_POST['is_self_referral']);
-        $allowedStatuses = [STATUS_PENDING, STATUS_APPROVED, STATUS_COMPLETED, STATUS_NOSHOW];
+        $allowedStatuses = [STATUS_APPROVED, STATUS_PENDING, STATUS_NOSHOW];
 
         if (!$hasAnyConcern) $errors[] = 'Please select or specify at least one concern in Section III.';
         if (empty($_POST['sex'])) $errors[] = 'Please select the student\'s sex in Section I.';
@@ -66,7 +67,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $selectedStudent) {
             $errors[] = 'Please provide the referring party\'s name in Section II, or mark this as a self-referral.';
         }
         if (empty($_POST['appointment_date'])) $errors[] = 'Please provide the appointment date.';
-        if (empty($_POST['appointment_time'])) $errors[] = 'Please provide the appointment time.';
+        if (empty($_POST['appointment_time'])) {
+            $errors[] = 'Please pick one of your available time slots.';
+        } elseif (!empty($_POST['appointment_date'])) {
+            // The time must be one of the counselor's open slots for that date
+            $openSlots = array_map(fn($s) => substr($s, 0, 5), Availability::getAvailableSlots((int)$user['id'], $_POST['appointment_date']));
+            if (!in_array(substr($_POST['appointment_time'], 0, 5), $openSlots, true)) {
+                $errors[] = 'That time slot is not available for the selected date. Please pick one of your open slots.';
+            }
+        }
         if (!in_array($_POST['status'] ?? '', $allowedStatuses, true)) $errors[] = 'Please choose a valid status.';
         if (empty($_POST['consent_certified'])) $errors[] = 'Please confirm Section VII before submitting.';
 
@@ -313,26 +322,36 @@ include __DIR__ . '/../partials/flash.php';
       </div>
 
       <h5 class="mt-4">Appointment Details</h5>
-      <p class="text-muted small">Since this is being recorded directly by the Guidance Office, set the actual date, time, and status rather than a preference.</p>
+      <p class="text-muted small">Pick a date to see your open time slots (the ones you set in Availability).</p>
       <div class="row g-3 mb-4">
         <div class="col-sm-4">
           <label class="form-label">Date <span class="text-danger">*</span></label>
-          <input type="date" name="appointment_date" class="form-control" value="<?= htmlspecialchars($old['appointment_date'] ?? date('Y-m-d')) ?>" required>
+          <input type="date" name="appointment_date" id="wkDate" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($old['appointment_date'] ?? date('Y-m-d')) ?>" required>
         </div>
-        <div class="col-sm-4">
-          <label class="form-label">Time <span class="text-danger">*</span></label>
-          <input type="time" name="appointment_time" class="form-control" value="<?= htmlspecialchars($old['appointment_time'] ?? date('H:i')) ?>" required>
+        <div class="col-sm-8">
+          <label class="form-label">Available Time Slots <span class="text-danger">*</span></label>
+          <div id="wkSlots" class="p-2 border rounded small">Pick a date first.</div>
+          <input type="hidden" name="appointment_time" id="wkTime" value="<?= htmlspecialchars($old['appointment_time'] ?? '') ?>">
         </div>
         <div class="col-sm-4">
           <label class="form-label">Status <span class="text-danger">*</span></label>
           <select name="status" class="form-select" required>
-            <option value="completed" <?= ($old['status'] ?? '') === 'completed' ? 'selected' : '' ?>>Completed — session already happened</option>
-            <option value="approved" <?= ($old['status'] ?? '') === 'approved' ? 'selected' : '' ?>>Approved — scheduled, hasn't happened yet</option>
+            <option value="approved" <?= ($old['status'] ?? 'approved') === 'approved' ? 'selected' : '' ?>>Approved — scheduled</option>
             <option value="pending" <?= ($old['status'] ?? '') === 'pending' ? 'selected' : '' ?>>Pending — still needs review</option>
             <option value="no-show" <?= ($old['status'] ?? '') === 'no-show' ? 'selected' : '' ?>>No-show</option>
           </select>
         </div>
       </div>
+      <script>
+        (function () {
+          var d = document.getElementById('wkDate');
+          var counselorId = <?= (int)$user['id'] ?>;
+          var preferred = <?= json_encode($old['appointment_time'] ?? '') ?>;
+          function load(keep) { if (d.value) loadAvailableSlots(counselorId, d.value, 'wkSlots', 'wkTime', keep); }
+          d.addEventListener('change', function () { load(''); });
+          window.addEventListener('load', function () { load(preferred); });
+        })();
+      </script>
 
       <h5 class="mt-4">VII. Consent and Acknowledgement</h5>
       <div class="mb-4">

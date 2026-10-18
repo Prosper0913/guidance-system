@@ -70,7 +70,12 @@ include __DIR__ . '/partials/header.php';
 ?>
 <?php if ($needsEducationLevel && $authenticatedUser): ?>
 <div class="card auth-card" style="max-width: 440px;">
-  <div class="card-header text-center"><h4 class="mb-0"><img src="assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 50px;"> <?= APP_NAME ?></h4></div>
+<div class="card-header text-center">
+  <h4 class="mb-0" style="font-size: clamp(1rem, 4.2vw, 1.2rem); white-space: nowrap;">
+    <img src="assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 40px; vertical-align: middle;">
+    <?= APP_NAME ?>
+  </h4>
+</div>
   <div class="card-body p-4">
     <p class="text-center mb-3">Welcome, <strong><?= htmlspecialchars($authenticatedUser['first_name'] . ' ' . $authenticatedUser['last_name']) ?></strong>!</p>
     <p class="text-center text-muted small mb-3">Please select your education level to continue. This will assign you to the correct guidance counselor.</p>

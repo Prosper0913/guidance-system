@@ -10,9 +10,21 @@ $user = AuthMiddleware::requireRole([ROLE_COUNSELOR, ROLE_ADMIN]);
 $tab = ($_GET['tab'] ?? 'appointments') === 'referrals' ? 'referrals' : 'appointments';
 $filter = $_GET['status'] ?? '';
 
+// Optional filters passed in from the dashboard report (date range and/or walk-in vs online)
+$dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from'] ?? '') ? $_GET['from'] : '';
+$dateTo = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to'] ?? '') ? $_GET['to'] : '';
+if (!$dateFrom || !$dateTo) { $dateFrom = $dateTo = ''; }
+$typeFilter = in_array($_GET['type'] ?? '', ['walk-in', 'online'], true) ? $_GET['type'] : '';
+$hasExtraFilters = $dateFrom || $typeFilter;
+function apptUrl(array $extra = []): string {
+    global $dateFrom, $dateTo, $typeFilter;
+    $q = array_merge(['tab' => 'appointments', 'from' => $dateFrom, 'to' => $dateTo, 'type' => $typeFilter], $extra);
+    return '?' . http_build_query(array_filter($q, fn($v) => $v !== '' && $v !== null));
+}
+
 $appointments = [];
 if ($tab === 'appointments' && $user['role'] === ROLE_COUNSELOR) {
-    $appointments = Appointment::forCounselor($user['id'], $filter ?: null);
+    $appointments = Appointment::forCounselor($user['id'], $filter ?: null, $dateFrom ?: null, $dateTo ?: null, $typeFilter ?: null);
 }
 
 $referrals = [];
@@ -56,10 +68,23 @@ include __DIR__ . '/../partials/flash.php';
   <?php else: ?>
     <div class="mb-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
       <div>
-        <a class="btn btn-sm <?= $filter === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments">All</a>
+        <a class="btn btn-sm <?= $filter === '' ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= apptUrl() ?>">All</a>
         <?php foreach (['pending','approved','rescheduled','completed','declined','cancelled','no-show'] as $s): ?>
-          <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="?tab=appointments&status=<?= $s ?>"><?= $s === 'rescheduled' ? 'Awaiting Confirmation' : ucfirst($s) ?></a>
+          <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= apptUrl(['status' => $s]) ?>"><?= $s === 'rescheduled' ? 'Awaiting Confirmation' : ucfirst($s) ?></a>
         <?php endforeach; ?>
+      </div>
+    </div>
+
+    <?php if ($hasExtraFilters): ?>
+      <div class="alert alert-info d-flex justify-content-between align-items-center py-2">
+        <span>
+          Showing <strong><?= $typeFilter ? ($typeFilter === 'walk-in' ? 'walk-in' : 'online') : 'all' ?></strong> appointments
+          <?php if ($dateFrom): ?>from <strong><?= date('M j, Y', strtotime($dateFrom)) ?></strong> to <strong><?= date('M j, Y', strtotime($dateTo)) ?></strong><?php endif; ?>
+          (<?= count($appointments) ?> found)
+        </span>
+        <a href="?tab=appointments" class="btn btn-sm btn-outline-secondary">Clear filters</a>
+      </div>
+    <?php endif; ?>
 
     <div class="card">
       <div class="card-body">
@@ -69,13 +94,15 @@ include __DIR__ . '/../partials/flash.php';
           <p class="swipe-hint d-md-none">⟷ Swipe left/right to see more</p>
           <div class="table-responsive">
           <table class="table align-middle table-compact" id="apptTable">
-            <thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Type</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Date</th><th>Time</th><th>Student ID</th><th>Student</th><th>Course / Strand</th><th>Type</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($appointments as $a): ?>
               <tr data-id="<?= $a['id'] ?>">
                 <td><?= htmlspecialchars($a['appointment_date']) ?></td>
                 <td><?= date('g:i A', strtotime($a['appointment_time'])) ?></td>
+                <td><?= htmlspecialchars($a['student_id_number'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($a['student_first'] . ' ' . $a['student_last']) ?></td>
+                <td><?= htmlspecialchars($a['student_course'] ?: '—') ?></td>
                 <td><?= ucfirst($a['type']) ?></td>
                 <td><?= htmlspecialchars($a['category_name'] ?? '—') ?><?= $a['is_confidential'] ? ' 🔒' : '' ?></td>
                 <td>
@@ -134,13 +161,15 @@ include __DIR__ . '/../partials/flash.php';
         <p class="swipe-hint d-md-none">⟷ Swipe left/right to see more</p>
         <div class="table-responsive">
         <table class="table align-middle table-compact">
-          <thead><tr><th>Ref No.</th><th>Date</th><th>Student</th><th>Referred By</th><th>Urgency</th><th>Status</th><th>Assigned</th><th></th></tr></thead>
+          <thead><tr><th>Ref No.</th><th>Date</th><th>Student ID</th><th>Student</th><th>Course / Strand</th><th>Referred By</th><th>Urgency</th><th>Status</th><th>Assigned</th><th></th></tr></thead>
           <tbody>
           <?php foreach ($referrals as $r): ?>
             <tr class="<?= $r['urgency_level'] === 'urgent' ? 'table-danger' : '' ?>">
               <td><?= htmlspecialchars($r['referral_no'] ?? '—') ?></td>
               <td><?= htmlspecialchars($r['referral_date']) ?></td>
+              <td><?= htmlspecialchars($r['student_id_number'] ?: '—') ?></td>
               <td><?= htmlspecialchars($r['student_name']) ?><?= $r['student_id'] ? ' <span class="badge bg-success">Linked</span>' : ' <span class="badge bg-secondary">Unlinked</span>' ?></td>
+              <td><?= htmlspecialchars($r['section_course_program'] ?: '—') ?></td>
               <td><?= htmlspecialchars($r['referring_party_name']) ?></td>
               <td><?= $r['urgency_level'] === 'urgent' ? '<span class="badge bg-danger">Urgent</span>' : '<span class="badge bg-secondary">Routine</span>' ?></td>
               <?php
