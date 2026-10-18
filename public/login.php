@@ -72,7 +72,7 @@ include __DIR__ . '/partials/header.php';
 <div class="card auth-card" style="max-width: 440px;">
 <div class="card-header text-center">
   <h4 class="mb-0" style="font-size: clamp(1rem, 4.2vw, 1.2rem); white-space: nowrap;">
-    <img src="assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 40px; vertical-align: middle;">
+    <!-- <img src="assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 40px; vertical-align: middle;"> -->
     <?= APP_NAME ?>
   </h4>
 </div>
