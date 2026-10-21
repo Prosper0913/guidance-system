@@ -73,7 +73,6 @@ include __DIR__ . '/../partials/flash.php';
           <a class="btn btn-sm <?= $filter === $s ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= apptUrl(['status' => $s]) ?>"><?= $s === 'rescheduled' ? 'Awaiting Confirmation' : ucfirst($s) ?></a>
         <?php endforeach; ?>
       </div>
-      <a class="btn btn-sm btn-outline-dark" href="record-walkin.php">+ Record Walk-in Appointment</a>
     </div>
 
     <?php if ($hasExtraFilters): ?>
