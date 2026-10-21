@@ -95,6 +95,36 @@ class User
         $stmt->execute([$userId, $level]);
     }
 
+    /**
+     * Change a user's password after verifying the current one.
+     * Returns false if the current password is wrong.
+     */
+    public static function changePassword(int $userId, string $currentPassword, string $newPassword): bool
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare('SELECT password_hash FROM users WHERE id = ?');
+        $stmt->execute([$userId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($currentPassword, $hash)) {
+            return false;
+        }
+        $upd = $db->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+        $upd->execute([password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
+        return true;
+    }
+
+    // Change a student's course/strand (e.g. after transferring). UPSERT because
+    // CMS-synced students may not have a student_profiles row yet.
+    public static function saveCourse(int $userId, string $course): void
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            'INSERT INTO student_profiles (user_id, course) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE course = VALUES(course)'
+        );
+        $stmt->execute([$userId, $course]);
+    }
+
     public static function idNumberExists(string $idNumber): bool
     {
         $db = Database::getConnection();
