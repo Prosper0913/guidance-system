@@ -93,7 +93,7 @@ $pageTitle = 'Create Account';
 include __DIR__ . '/partials/header.php';
 ?>
 <div class="card auth-card" style="max-width: 560px;">
-  <div class="card-header text-center"><h4 class="mb-0"><img src="assets/images/TCM logo (2).png" alt="TCM Logo" style="height: 50px;"> <?= APP_NAME ?></h4></div>
+  <div class="card-header text-center"><h4 class="mb-0"><img src="assets/images/tcm_guidance_logo.png" alt="Guidance Logo" style="height: 50px;"> <?= APP_NAME ?></h4></div>
   <div class="card-body p-4">
     <p class="text-center text-muted small mb-3">Student Account Registration</p>
     <?php foreach ($errors as $e): ?>
