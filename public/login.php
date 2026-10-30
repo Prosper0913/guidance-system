@@ -95,7 +95,7 @@ include __DIR__ . '/partials/header.php';
 <?php else: ?>
 <div class="card auth-card">
   <div class="card-header text-center"><h4 class="mb-0"><img src="assets/images/tcm_guidance_logo.png" alt="Guidance Logo" style="height: 90px;"></h4>
-  <h5 style="font-size: 1.4 rem;"><?= APP_NAME ?></>
+  <h5 style="font-size: 1.4rem;"><?= APP_NAME ?></h5>
 </div>
   <div class="card-body p-4">
     <?php foreach ($errors as $e): ?>
@@ -116,6 +116,13 @@ include __DIR__ . '/partials/header.php';
     <p class="text-center mt-3 mb-0">
       New student? <a href="<?= BASE_URL ?>/register.php">Create an account</a>
     </p>
+
+    <!-- Install as an app (shown by assets/js/pwa.js unless it is already installed) -->
+    <div id="installApp" class="text-center mt-3 pt-3 border-top" hidden>
+      <p class="small text-muted mb-2">Get the app on your phone or computer. It opens like any other app, with no need to search for the website.</p>
+      <button type="button" id="installBtn" class="btn btn-outline-success w-100">&#11015; Install the app</button>
+      <div id="installHelp" class="small text-muted mt-2" hidden></div>
+    </div>
   </div>
 </div>
 <?php endif; ?>

@@ -28,6 +28,16 @@ $unread = $user ? Notification::unreadCount($user['id']) : 0;
       <?php endif; ?>
     </script>
     <script src="<?= BASE_URL ?>/assets/js/main.js"></script>
+
+    <!-- Installable app (PWA) -->
+    <link rel="manifest" href="<?= BASE_URL ?>/manifest.webmanifest">
+    <meta name="theme-color" content="#0A3520">
+    <link rel="icon" type="image/png" sizes="48x48" href="<?= BASE_URL ?>/assets/icons/favicon-48.png">
+    <link rel="apple-touch-icon" href="<?= BASE_URL ?>/assets/icons/apple-touch-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="TCM Guidance">
+    <script src="<?= BASE_URL ?>/assets/js/pwa.js" defer></script>
 </head>
 <body>
 <?php if ($user): ?>
