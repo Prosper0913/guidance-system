@@ -63,6 +63,83 @@ class Availability
         return (int)$db->lastInsertId();
     }
 
+    /**
+     * Block every WEEKDAY from $from through $to (inclusive, 'Y-m-d'). Saturdays and Sundays
+     * are skipped because the office is already closed then. Dates the counselor has already
+     * blocked are left alone, so re-submitting an overlapping range doesn't create duplicates.
+     * One row per date is stored, so the existing per-date checks keep working unchanged.
+     * Returns the number of dates newly blocked.
+     */
+    public static function addExceptionRange(int $counselorId, string $from, string $to, ?string $reason): int
+    {
+        $db = Database::getConnection();
+        $existing = $db->prepare(
+            'SELECT exception_date FROM counselor_availability_exceptions
+             WHERE counselor_id = ? AND is_available = 0 AND exception_date BETWEEN ? AND ?'
+        );
+        $existing->execute([$counselorId, $from, $to]);
+        $already = array_flip(array_column($existing->fetchAll(), 'exception_date'));
+
+        $insert = $db->prepare(
+            'INSERT INTO counselor_availability_exceptions (counselor_id, exception_date, is_available, reason)
+             VALUES (?, ?, 0, ?)'
+        );
+        $added = 0;
+        $db->beginTransaction();
+        try {
+            for ($d = new DateTime($from); $d <= new DateTime($to); $d->modify('+1 day')) {
+                if (in_array((int)$d->format('w'), [0, 6], true)) continue;
+                $date = $d->format('Y-m-d');
+                if (isset($already[$date])) continue;
+                $insert->execute([$counselorId, $date, $reason]);
+                $added++;
+            }
+            $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+        return $added;
+    }
+
+    // Upcoming blocked dates for the availability page, oldest first.
+    public static function getUpcomingBlocked(int $counselorId): array
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            'SELECT exception_date, reason FROM counselor_availability_exceptions
+             WHERE counselor_id = ? AND is_available = 0 AND exception_date >= CURDATE()
+             ORDER BY exception_date ASC'
+        );
+        $stmt->execute([$counselorId]);
+        return $stmt->fetchAll();
+    }
+
+    // Un-block every blocked date from $from through $to (inclusive) for this counselor.
+    public static function removeExceptionRange(int $counselorId, string $from, string $to): void
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            'DELETE FROM counselor_availability_exceptions
+             WHERE counselor_id = ? AND is_available = 0 AND exception_date BETWEEN ? AND ?'
+        );
+        $stmt->execute([$counselorId, $from, $to]);
+    }
+
+    // Pending/approved/awaiting-confirmation appointments inside a date range. Blocking dates
+    // does not cancel these, so the counselor is warned about them.
+    public static function countActiveAppointmentsInRange(int $counselorId, string $from, string $to): int
+    {
+        $db = Database::getConnection();
+        $stmt = $db->prepare(
+            "SELECT COUNT(*) FROM appointments
+             WHERE counselor_id = ? AND appointment_date BETWEEN ? AND ?
+               AND status IN ('pending','approved','rescheduled')"
+        );
+        $stmt->execute([$counselorId, $from, $to]);
+        return (int)$stmt->fetchColumn();
+    }
+
     // Slots locked by an approved appointment for a counselor on a given date.
     // Pending requests do NOT block the slot — multiple students may request the
     // same time; the counselor picks which one to approve.

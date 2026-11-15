@@ -47,9 +47,39 @@ class User
     }
 
     /**
+     * The education levels a counselor can be assigned to. Keys are the values stored in
+     * student_profiles.education_level and counselor_profiles.education_level_group;
+     * the order here is the canonical order used when saving and displaying.
+     */
+    public static function educationLevels(): array
+    {
+        return [
+            'junior_highschool' => 'Junior High School',
+            'senior_highschool' => 'Senior High School',
+            'college'           => 'College',
+        ];
+    }
+
+    /**
+     * Human-readable list ("Junior High School, College") for a stored
+     * education_level_group value like 'junior_highschool,college'.
+     */
+    public static function educationLevelLabels(?string $group): string
+    {
+        $all = self::educationLevels();
+        $labels = [];
+        foreach (array_filter(explode(',', (string)$group)) as $code) {
+            if (isset($all[$code])) $labels[] = $all[$code];
+        }
+        return implode(', ', $labels);
+    }
+
+    /**
      * Get the counselor assigned to handle a student's education level.
-     * Junior Highschool -> counselor with education_level_group = 'junior_highschool'
-     * Senior Highschool / College -> counselor with education_level_group = 'senior_college'
+     * A counselor covers one or more levels (counselor_profiles.education_level_group is a
+     * comma-separated list, e.g. 'junior_highschool,senior_highschool'). If more than one
+     * active counselor covers the level, the one covering the FEWEST levels wins (the most
+     * dedicated counselor), then the earliest-created account, so the result is stable.
      */
     public static function getCounselorForStudent(int $studentId): ?array
     {
@@ -60,22 +90,17 @@ class User
 
         $db = Database::getConnection();
 
-        if ($profile['education_level'] === 'junior_highschool') {
-            $group = 'junior_highschool';
-        } else {
-            // Both senior_highschool and college go to the same counselor
-            $group = 'senior_college';
-        }
-
         $stmt = $db->prepare(
             "SELECT u.id, u.first_name, u.last_name, cp.specialization, cp.office_location
              FROM users u
              JOIN counselor_profiles cp ON cp.user_id = u.id
              WHERE u.role = 'counselor' AND u.status = 'active'
-               AND cp.education_level_group = ?
+               AND FIND_IN_SET(?, cp.education_level_group) > 0
+             ORDER BY (LENGTH(cp.education_level_group) - LENGTH(REPLACE(cp.education_level_group, ',', ''))) ASC,
+                      u.id ASC
              LIMIT 1"
         );
-        $stmt->execute([$group]);
+        $stmt->execute([$profile['education_level']]);
         $counselor = $stmt->fetch();
         return $counselor ?: null;
     }
@@ -193,10 +218,17 @@ class User
         $userId = (int)$db->lastInsertId();
 
         if ($data['role'] === ROLE_COUNSELOR) {
+            // Education levels the counselor covers (validated + in canonical order by the
+            // caller). Stored as a comma-separated list for routing, and as readable labels
+            // in `specialization` so existing screens that show it keep working.
+            $levels = array_values(array_intersect(array_keys(self::educationLevels()), (array)($data['education_levels'] ?? [])));
+            $group = $levels ? implode(',', $levels) : null;
+            $specialization = $levels ? self::educationLevelLabels($group) : ($data['specialization'] ?? null);
+
             $stmt2 = $db->prepare(
-                'INSERT INTO counselor_profiles (user_id, specialization, office_location) VALUES (?, ?, ?)'
+                'INSERT INTO counselor_profiles (user_id, specialization, education_level_group, office_location) VALUES (?, ?, ?, ?)'
             );
-            $stmt2->execute([$userId, $data['specialization'] ?? null, $data['office_location'] ?? null]);
+            $stmt2->execute([$userId, $specialization, $group, $data['office_location'] ?? null]);
         }
         return $userId;
     }
@@ -239,7 +271,7 @@ public static function allByRole(string $role): array
             // Join counselor profiles
             $stmt = $db->prepare('
                 SELECT u.id, u.id_number, u.first_name, u.last_name, u.email, u.status, u.created_at,
-                       cp.specialization
+                       cp.specialization, cp.education_level_group
                 FROM users u
                 LEFT JOIN counselor_profiles cp ON u.id = cp.user_id
                 WHERE u.role = ? 

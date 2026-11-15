@@ -23,14 +23,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::validate($_POST['csrf_token']
         Availability::removeWeekly((int)$_POST['id'], $user['id']);
         $_SESSION['flash'] = ['type' => 'success', 'message' => 'Removed.'];
     } elseif (isset($_POST['add_exception'])) {
-        Availability::addException($user['id'], $_POST['exception_date'], false, Validator::clean($_POST['reason'] ?? ''));
-        $_SESSION['flash'] = ['type' => 'success', 'message' => 'Date blocked.'];
+        // "From" is exception_date; "To" is optional and defaults to the same day (single-day block).
+        $from = $_POST['exception_date'] ?? '';
+        $to = ($_POST['exception_end'] ?? '') !== '' ? $_POST['exception_end'] : $from;
+        $reason = mb_substr(trim($_POST['reason'] ?? ''), 0, 255); // plain text; escaped on output
+        $isDate = fn($v) => (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$v) && strtotime($v) !== false;
+
+        if (!$isDate($from) || !$isDate($to)) {
+            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Please pick a valid date.'];
+        } elseif ($from < date('Y-m-d')) {
+            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'You can only block today or future dates.'];
+        } elseif ($to < $from) {
+            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'The end date can\'t be before the start date.'];
+        } elseif ((strtotime($to) - strtotime($from)) / 86400 > 365) {
+            $_SESSION['flash'] = ['type' => 'danger', 'message' => 'A block can cover at most one year. Please use a shorter range.'];
+        } else {
+            $added = Availability::addExceptionRange($user['id'], $from, $to, $reason);
+            if ($added === 0) {
+                $_SESSION['flash'] = ['type' => 'info', 'message' => 'Nothing to block — those dates are weekends or already blocked.'];
+            } else {
+                $msg = $added === 1 ? '1 date blocked.' : "{$added} dates blocked.";
+                $booked = Availability::countActiveAppointmentsInRange($user['id'], $from, $to);
+                if ($booked > 0) {
+                    $msg .= " Note: you still have {$booked} appointment(s) in this range — blocking dates doesn't cancel them, so reschedule or cancel them from Appointments.";
+                }
+                $_SESSION['flash'] = ['type' => $booked > 0 ? 'warning' : 'success', 'message' => $msg];
+            }
+        }
+    } elseif (isset($_POST['remove_block'])) {
+        $from = $_POST['block_from'] ?? '';
+        $to = $_POST['block_to'] ?? '';
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to) && $from <= $to) {
+            Availability::removeExceptionRange($user['id'], $from, $to);
+            $_SESSION['flash'] = ['type' => 'success', 'message' => 'Blocked date(s) removed.'];
+        }
     }
     header('Location: ' . BASE_URL . '/counselor/availability.php');
     exit;
 }
 
 $weekly = Availability::getWeekly($user['id']);
+
+// Group upcoming blocked dates into runs: consecutive weekdays with the same reason show as
+// one range (e.g. Oct 12 – Oct 16) so a range block can be reviewed and removed in one click.
+$blockedRuns = [];
+foreach (Availability::getUpcomingBlocked($user['id']) as $b) {
+    $last = count($blockedRuns) - 1;
+    if ($last >= 0
+        && $blockedRuns[$last]['reason'] === (string)$b['reason']
+        && date('Y-m-d', strtotime($blockedRuns[$last]['to'] . ' +1 weekday')) === $b['exception_date']) {
+        $blockedRuns[$last]['to'] = $b['exception_date'];
+    } else {
+        $blockedRuns[] = ['from' => $b['exception_date'], 'to' => $b['exception_date'], 'reason' => (string)$b['reason']];
+    }
+}
 $googleConnected = GoogleToken::isConnected($user['id']);
 $pageTitle = 'My Availability';
 include __DIR__ . '/../partials/header.php';
@@ -109,23 +155,67 @@ include __DIR__ . '/../partials/flash.php';
 
   <div class="col-md-6 mb-4">
     <div class="card">
-      <div class="card-header">Block a Specific Date</div>
+      <div class="card-header">Block Date(s)</div>
       <div class="card-body">
-        <p class="text-muted small">Use this for leave, holidays, or seminars — the whole day becomes unavailable for booking.</p>
+        <p class="text-muted small">Use this for leave, holidays, or seminars — whole days become unavailable for booking. Pick one day, or set an end date to block a range (e.g. Oct 11 – Oct 15). Saturdays and Sundays are skipped since the office is already closed.</p>
         <form method="post">
           <?= Csrf::field() ?>
-          <div class="mb-2">
-            <label class="form-label">Date</label>
-            <input type="date" name="exception_date" class="form-control" required min="<?= date('Y-m-d') ?>">
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label">From</label>
+              <input type="date" name="exception_date" id="blockFrom" class="form-control" required min="<?= date('Y-m-d') ?>">
+            </div>
+            <div class="col-6">
+              <label class="form-label">To <span class="text-muted small">(optional)</span></label>
+              <input type="date" name="exception_end" id="blockTo" class="form-control" min="<?= date('Y-m-d') ?>">
+            </div>
           </div>
           <div class="mb-2">
             <label class="form-label">Reason (optional)</label>
             <input type="text" name="reason" class="form-control">
           </div>
-          <button type="submit" name="add_exception" class="btn btn-primary btn-sm">Block Date</button>
+          <button type="submit" name="add_exception" class="btn btn-primary btn-sm">Block Date(s)</button>
         </form>
+
+        <?php if ($blockedRuns): ?>
+          <hr>
+          <div class="fw-semibold small mb-2">Upcoming blocked dates</div>
+          <ul class="list-group list-group-flush">
+            <?php foreach ($blockedRuns as $run): ?>
+              <li class="list-group-item px-0 d-flex justify-content-between align-items-center gap-2">
+                <div class="small">
+                  <?php if ($run['from'] === $run['to']): ?>
+                    <?= date('M j, Y', strtotime($run['from'])) ?>
+                  <?php else: ?>
+                    <?= date('M j, Y', strtotime($run['from'])) ?> – <?= date('M j, Y', strtotime($run['to'])) ?>
+                  <?php endif; ?>
+                  <?php if ($run['reason'] !== ''): ?>
+                    <div class="text-muted"><?= htmlspecialchars(html_entity_decode($run['reason'], ENT_QUOTES, 'UTF-8')) ?></div>
+                  <?php endif; ?>
+                </div>
+                <form method="post" onsubmit="return confirm('Remove this block? These dates will open up for booking again.');">
+                  <?= Csrf::field() ?>
+                  <input type="hidden" name="block_from" value="<?= htmlspecialchars($run['from']) ?>">
+                  <input type="hidden" name="block_to" value="<?= htmlspecialchars($run['to']) ?>">
+                  <button type="submit" name="remove_block" class="btn btn-sm btn-outline-danger">Remove</button>
+                </form>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
       </div>
     </div>
   </div>
 </div>
+<script>
+(function () {
+  const from = document.getElementById('blockFrom');
+  const to = document.getElementById('blockTo');
+  if (!from || !to) return;
+  from.addEventListener('change', function () {
+    to.min = from.value || to.min;
+    if (to.value && to.value < from.value) to.value = '';
+  });
+})();
+</script>
 <?php include __DIR__ . '/../partials/footer.php'; ?>

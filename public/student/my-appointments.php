@@ -127,6 +127,9 @@ include __DIR__ . '/../partials/flash.php';
                   <span class="badge badge-status-<?= $a['status'] ?>"><?= ucfirst($a['status']) ?></span>
                   <?php if (!empty($a['rescheduled_at'])): ?>
                     <span class="badge bg-warning text-dark" title="Your counselor moved this appointment on <?= date('M j, Y g:i A', strtotime($a['rescheduled_at'])) ?>">Rescheduled</span>
+                    <?php if ($a['status'] === 'approved' && !empty($a['reschedule_comment'])): ?>
+                      <div class="small text-muted mt-1">Counselor's comment: <?= htmlspecialchars($a['reschedule_comment']) ?></div>
+                    <?php endif; ?>
                   <?php endif; ?>
                   <?php if ($a['status'] === 'cancelled' && !empty($a['cancellation_reason'])): ?>
                     <div class="small text-muted mt-1">Reason: <?= htmlspecialchars($a['cancellation_reason']) ?></div>
@@ -156,6 +159,9 @@ include __DIR__ . '/../partials/flash.php';
                   <?= htmlspecialchars($a['proposed_date']) ?> at <?= date('g:i A', strtotime($a['proposed_time'])) ?>.
                   Your original slot (<?= htmlspecialchars($a['appointment_date']) ?> at <?= date('g:i A', strtotime($a['appointment_time'])) ?>) no longer holds — please confirm or decline below.
                   If you don't confirm, this appointment will be cancelled.
+                  <?php if (!empty($a['reschedule_comment'])): ?>
+                    <div class="mt-1"><strong>Counselor's comment:</strong> <?= nl2br(htmlspecialchars($a['reschedule_comment'])) ?></div>
+                  <?php endif; ?>
                   <div class="mt-2 d-flex gap-2">
                     <form method="post" onsubmit="return confirm('Confirm this new appointment time?');">
                       <?= Csrf::field() ?>
@@ -210,7 +216,12 @@ include __DIR__ . '/../partials/flash.php';
             <tr>
               <td><?= htmlspecialchars($r['referral_no'] ?? '—') ?></td>
               <td><?= date('M j, Y', strtotime($r['submitted_at'])) ?></td>
-              <td><span class="badge <?= $statusBadge[$r['status']] ?? 'bg-secondary' ?>"><?= $statusLabels[$r['status']] ?? ucfirst($r['status']) ?></span></td>
+              <td>
+                <span class="badge <?= $statusBadge[$r['status']] ?? 'bg-secondary' ?>"><?= $statusLabels[$r['status']] ?? ucfirst($r['status']) ?></span>
+                <?php if ($r['status'] === 'cancelled' && !empty($r['cancellation_reason'])): ?>
+                  <div class="small text-muted mt-1">Reason: <?= htmlspecialchars($r['cancellation_reason']) ?></div>
+                <?php endif; ?>
+              </td>
               <td><?= $r['counselor_first'] ? htmlspecialchars($r['counselor_first'] . ' ' . $r['counselor_last']) : '—' ?></td>
               <td>
                 <?php if ($r['appointment_id']): ?>

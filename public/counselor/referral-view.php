@@ -80,10 +80,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::validate($_POST['csrf_token']
         Referral::process($id, [
             'status' => 'cancelled',
             'assigned_counselor_id' => $currentReferral['assigned_counselor_id'],
-            'office_remarks' => Validator::clean($_POST['office_remarks'] ?? ''),
+            // keep whatever remarks were already saved; the cancel comment is stored separately
+            'office_remarks' => $currentReferral['office_remarks'],
         ], $user['id']);
+        // Optional comment explaining why — stored as plain text (escaped when displayed)
+        Referral::setCancellationReason($id, $_POST['cancel_reason'] ?? null);
 
-        // Notify the student that their referral was cancelled
+        // Notify the student that their referral was cancelled (includes the comment, if any)
         $updated = Referral::findById($id);
         NotificationService::referralCancelled($updated);
 
@@ -269,6 +272,9 @@ include __DIR__ . '/../partials/flash.php';
       <div class="card-body">
         <?php if ($referral['status'] === 'cancelled'): ?>
           <p class="mb-0 text-muted small">This referral was cancelled and can no longer be reopened or scheduled. The student has been notified and can submit a new referral, or pick a new time using the same details, from their My Requests page.</p>
+          <?php if (!empty($referral['cancellation_reason'])): ?>
+            <hr><p class="small mb-0"><strong>Reason given to the student:</strong> <?= nl2br(htmlspecialchars($referral['cancellation_reason'])) ?></p>
+          <?php endif; ?>
 
         <?php elseif ($referral['appointment_id']): ?>
           <p class="mb-2"><span class="badge bg-success">Accepted</span> <span class="badge bg-success">Appointment Scheduled</span></p>
@@ -322,7 +328,7 @@ include __DIR__ . '/../partials/flash.php';
                 <?= ($referral['preferred_date'] && $referral['preferred_time']) ? 'Confirm & Schedule Appointment' : 'Confirm Referral' ?>
               </button>
               <?php if ($referral['status'] === 'pending'): ?>
-                <button type="submit" name="cancel_referral" class="btn btn-outline-danger" onclick="return confirm('Cancel this referral? This action cannot be undone.')">Cancel Referral</button>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelReferralModal">Cancel Referral</button>
               <?php endif; ?>
             </div>
           </form>
@@ -331,4 +337,28 @@ include __DIR__ . '/../partials/flash.php';
     </div>
   </div>
 </div>
+
+<?php if ($referral['status'] === 'pending' && !$referral['appointment_id']): ?>
+<!-- Cancel modal: lives outside the review form (forms can't nest) and posts its own request. -->
+<div class="modal fade" id="cancelReferralModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" class="modal-content">
+      <?= Csrf::field() ?>
+      <div class="modal-header">
+        <h5 class="modal-title">Cancel Referral <?= htmlspecialchars($referral['referral_no'] ?? '') ?></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">This can't be undone. The student will be notified and can submit a new referral or pick a new time.</p>
+        <label class="form-label" for="cancelReason">Reason for cancelling <span class="text-muted small">(optional — the student will see this)</span></label>
+        <textarea name="cancel_reason" id="cancelReason" class="form-control" rows="3" maxlength="500"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep Referral</button>
+        <button type="submit" name="cancel_referral" class="btn btn-danger">Cancel Referral</button>
+      </div>
+    </form>
+  </div>
+</div>
+<?php endif; ?>
 <?php include __DIR__ . '/../partials/footer.php'; ?>

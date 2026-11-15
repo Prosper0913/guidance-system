@@ -364,6 +364,16 @@ class Referral
     }
 
     // Section VIII — Guidance Office processing
+    // Optional comment a counselor leaves when cancelling a referral; shown to the student.
+    // Pass null/'' to clear it.
+    public static function setCancellationReason(int $referralId, ?string $reason): void
+    {
+        $reason = $reason !== null ? mb_substr(trim($reason), 0, 500) : null;
+        $db = Database::getConnection();
+        $stmt = $db->prepare('UPDATE referrals SET cancellation_reason = ? WHERE id = ?');
+        $stmt->execute([$reason !== '' ? $reason : null, $referralId]);
+    }
+
     public static function process(int $referralId, array $data, int $processedBy): void
     {
         $db = Database::getConnection();

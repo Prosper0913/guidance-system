@@ -127,6 +127,7 @@ include __DIR__ . '/../partials/flash.php';
                   <?php elseif ($a['status'] === 'rescheduled'): ?>
                     <div class="small text-muted mb-1">
                       Proposed: <?= htmlspecialchars($a['proposed_date']) ?> at <?= date('g:i A', strtotime($a['proposed_time'])) ?> — waiting on the student.
+                      <?php if (!empty($a['reschedule_comment'])): ?><br>Your comment: <?= htmlspecialchars($a['reschedule_comment']) ?><?php endif; ?>
                     </div>
                     <button class="btn btn-sm btn-outline-dark" onclick="openRescheduleModal(<?= $a['id'] ?>, '<?= htmlspecialchars($a['proposed_date']) ?>')">Change Proposed Time</button>
                     <button class="btn btn-sm btn-outline-danger" onclick="setStatus(<?= $a['id'] ?>,'cancelled')">Withdraw & Cancel</button>
@@ -182,6 +183,9 @@ include __DIR__ . '/../partials/flash.php';
                 ][$r['status']] ?? 'bg-info text-dark';
               ?>
               <td><span class="badge <?= $badgeClass ?>"><?= $statusLabels[$r['status']] ?? ucfirst($r['status']) ?></span>
+                <?php if ($r['status'] === 'cancelled' && !empty($r['cancellation_reason'])): ?>
+                  <div class="small text-muted mt-1">Reason: <?= htmlspecialchars($r['cancellation_reason']) ?></div>
+                <?php endif; ?>
                 <?php if (($r['conflicting_preference_count'] ?? 0) > 0): ?>
                   <span class="badge bg-warning text-dark ms-1" title="Other students prefer this exact date/time">⚠ +<?= $r['conflicting_preference_count'] ?> same-slot request<?= $r['conflicting_preference_count'] > 1 ? 's' : '' ?></span>
                   <a href="resolve-conflict.php?date=<?= urlencode($r['preferred_date']) ?>&time=<?= urlencode($r['preferred_time']) ?>" class="btn btn-sm btn-outline-warning ms-1 py-0">Resolve</a>
@@ -218,6 +222,10 @@ include __DIR__ . '/../partials/flash.php';
           <label class="form-label">Available Time Slots</label>
           <div id="rescheduleSlots" class="p-2 border rounded small">Pick a date first.</div>
           <input type="hidden" id="rescheduleTime">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="rescheduleComment">Comment <span class="text-muted small">(optional — the student will see this)</span></label>
+          <textarea id="rescheduleComment" class="form-control" rows="2" maxlength="500" placeholder="e.g. I have a faculty meeting at the original time."></textarea>
         </div>
         <div id="rescheduleError" class="text-danger small"></div>
       </div>
@@ -281,6 +289,7 @@ function openRescheduleModal(id, currentDate) {
   document.getElementById('rescheduleError').textContent = '';
   document.getElementById('rescheduleSlots').innerHTML = 'Pick a date first.';
   document.getElementById('rescheduleTime').value = '';
+  document.getElementById('rescheduleComment').value = '';
   rescheduleDateInput.value = currentDate || '';
   bootstrap.Modal.getOrCreateInstance(rescheduleModalEl).show();
   if (currentDate) {
@@ -308,6 +317,7 @@ if (confirmRescheduleBtn) {
     fd.append('appointment_id', rescheduleTargetId);
     fd.append('new_date', rescheduleDateInput.value);
     fd.append('new_time', newTime);
+    fd.append('comment', document.getElementById('rescheduleComment').value.trim());
     fetch(window.BASE_URL + '/api/reschedule-appointment.php', { method: 'POST', body: fd })
       .then(res => res.json())
       .then(data => {

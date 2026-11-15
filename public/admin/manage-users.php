@@ -7,18 +7,27 @@ require_once __DIR__ . '/../../src/Helpers/Validator.php';
 
 $user = AuthMiddleware::requireRole([ROLE_ADMIN]);
 $errors = [];
+$levelOptions = User::educationLevels();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::validate($_POST['csrf_token'] ?? null)) {
     if (isset($_POST['create_staff'])) {
         $role = $_POST['role'] === ROLE_ADMIN ? ROLE_ADMIN : ROLE_COUNSELOR;
         $idNumber = Validator::clean($_POST['id_number']);
         $email = trim($_POST['email']);
+        // Education levels this counselor covers (valid values only, canonical order).
+        // Students are routed to the counselor whose levels include their own.
+        $levels = [];
+        if ($role === ROLE_COUNSELOR) {
+            $levels = array_values(array_intersect(array_keys($levelOptions), (array)($_POST['education_levels'] ?? [])));
+        }
         if (!Validator::email($email)) {
             $errors[] = 'Valid email required.';
         } elseif (User::findByEmail($email)) {
             $errors[] = 'Email already registered.';
         } elseif (User::idNumberExists($idNumber)) {
             $errors[] = 'ID number already registered.';
+        } elseif ($role === ROLE_COUNSELOR && !$levels) {
+            $errors[] = 'Select at least one education level for the counselor.';
         } else {
             User::createStaff([
                 'role' => $role,
@@ -27,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::validate($_POST['csrf_token']
                 'last_name' => Validator::clean($_POST['last_name']),
                 'email' => $email,
                 'contact_number' => Validator::clean($_POST['contact_number'] ?? ''),
-                'specialization' => Validator::clean($_POST['specialization'] ?? ''),
+                'education_levels' => $levels,
                 'office_location' => Validator::clean($_POST['office_location'] ?? ''),
                 'password' => $_POST['password'],
             ]);
@@ -60,11 +69,11 @@ include __DIR__ . '/../partials/flash.php';
 <div class="card mb-4">
   <div class="card-header">Create Counselor / Admin Account</div>
   <div class="card-body">
-    <form method="post" class="row g-2">
+    <form method="post" class="row g-2" id="staffForm">
       <?= Csrf::field() ?>
       <div class="col-md-2">
         <label class="form-label">Role</label>
-        <select name="role" class="form-select">
+        <select name="role" id="staffRole" class="form-select">
           <option value="counselor">Counselor</option>
           <option value="admin">Admin</option>
         </select>
@@ -74,7 +83,23 @@ include __DIR__ . '/../partials/flash.php';
       <div class="col-md-2"><label class="form-label">Last Name</label><input type="text" name="last_name" class="form-control" required></div>
       <div class="col-md-2"><label class="form-label">Email</label><input type="email" name="email" class="form-control" required></div>
       <div class="col-md-2"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required minlength="8"></div>
-      <div class="col-md-3"><label class="form-label">Specialization (counselor)</label><input type="text" name="specialization" class="form-control"></div>
+      <div class="col-md-3" id="levelsWrap">
+        <label class="form-label">Specialization (counselor)</label>
+        <div class="dropdown">
+          <button type="button" id="levelsBtn" class="btn btn-outline-secondary dropdown-toggle w-100 text-start"
+                  data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">Select education levels</button>
+          <div class="dropdown-menu p-2 w-100" style="min-width: 15rem;">
+            <?php foreach ($levelOptions as $code => $label): ?>
+              <div class="form-check">
+                <input class="form-check-input level-check" type="checkbox" name="education_levels[]" value="<?= htmlspecialchars($code) ?>" id="lvl_<?= htmlspecialchars($code) ?>">
+                <label class="form-check-label w-100" for="lvl_<?= htmlspecialchars($code) ?>"><?= htmlspecialchars($label) ?></label>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <div class="form-text">Students are routed to the counselor who covers their education level.</div>
+        <div class="text-danger small d-none" id="levelsError">Select at least one education level.</div>
+      </div>
       <div class="col-md-3"><label class="form-label">Office Location (counselor)</label><input type="text" name="office_location" class="form-control"></div>
       <div class="col-md-3"><label class="form-label">Contact Number</label><input type="text" name="contact_number" class="form-control"></div>
       <div class="col-md-3 d-flex align-items-end"><button type="submit" name="create_staff" class="btn btn-primary w-100">Create Account</button></div>
@@ -116,7 +141,10 @@ function renderUserTable($title, $rows, $type = 'admin') {
         echo '<td>' . htmlspecialchars($u['year_level'] ?? $u['year'] ?? 'N/A') . '</td>';
         echo '<td>' . htmlspecialchars($u['section'] ?? 'N/A') . '</td>';
       } elseif ($type === 'counselor') {
-        echo '<td>' . htmlspecialchars($u['specialization'] ?? 'N/A') . '</td>';
+        // Show the covered education levels; fall back to the free-text value for
+        // older counselor accounts that were created before levels were tracked.
+        $levelText = User::educationLevelLabels($u['education_level_group'] ?? null);
+        echo '<td>' . htmlspecialchars($levelText !== '' ? $levelText : ($u['specialization'] ?: 'N/A')) . '</td>';
       }
 
       echo '<td><span class="badge bg-' . ($u['status'] === 'active' ? 'success' : 'secondary') . '">' . htmlspecialchars($u['status']) . '</span></td>';
@@ -135,4 +163,36 @@ renderUserTable('Counselors', $counselors, 'counselor');
 renderUserTable('Administrators', $admins, 'admin');
 renderUserTable('Students', $students, 'student');
 ?>
+<script>
+(function () {
+  const role = document.getElementById('staffRole');
+  const wrap = document.getElementById('levelsWrap');
+  const btn = document.getElementById('levelsBtn');
+  const err = document.getElementById('levelsError');
+  const checks = Array.from(document.querySelectorAll('.level-check'));
+  const form = document.getElementById('staffForm');
+
+  function refreshLabel() {
+    const picked = checks.filter(c => c.checked).map(c => c.nextElementSibling.textContent.trim());
+    btn.textContent = picked.length ? picked.join(', ') : 'Select education levels';
+    if (picked.length) err.classList.add('d-none');
+  }
+  function refreshRole() {
+    const isCounselor = role.value === 'counselor';
+    wrap.classList.toggle('d-none', !isCounselor);
+    checks.forEach(c => { c.disabled = !isCounselor; });
+  }
+
+  checks.forEach(c => c.addEventListener('change', refreshLabel));
+  role.addEventListener('change', refreshRole);
+  form.addEventListener('submit', function (e) {
+    if (role.value === 'counselor' && !checks.some(c => c.checked)) {
+      e.preventDefault();
+      err.classList.remove('d-none');
+    }
+  });
+  refreshLabel();
+  refreshRole();
+})();
+</script>
 <?php include __DIR__ . '/../partials/footer.php'; ?>

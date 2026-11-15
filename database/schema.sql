@@ -40,6 +40,7 @@ CREATE TABLE `appointments` (
   `is_confidential` tinyint(1) NOT NULL DEFAULT 0,
   `notes` text DEFAULT NULL,
   `cancellation_reason` varchar(255) DEFAULT NULL,
+  `reschedule_comment` varchar(500) DEFAULT NULL,
   `google_event_id` varchar(255) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -195,7 +196,7 @@ CREATE TABLE `counselor_google_tokens` (
 CREATE TABLE `counselor_profiles` (
   `user_id` int(11) NOT NULL,
   `specialization` varchar(150) DEFAULT NULL,
-  `education_level_group` varchar(30) DEFAULT NULL,
+  `education_level_group` varchar(100) DEFAULT NULL,
   `office_location` varchar(150) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -215,7 +216,7 @@ CREATE TABLE `notifications` (
   `user_id` int(11) NOT NULL,
   `appointment_id` int(11) DEFAULT NULL,
   `referral_id` int(11) DEFAULT NULL,
-  `message` varchar(255) NOT NULL,
+  `message` varchar(1000) NOT NULL,
   `channel` enum('in-app','email') NOT NULL DEFAULT 'in-app',
   `is_read` tinyint(1) NOT NULL DEFAULT 0,
   `sent_at` datetime NOT NULL DEFAULT current_timestamp()
@@ -270,6 +271,7 @@ CREATE TABLE `referrals` (
   `assigned_counselor_id` int(11) DEFAULT NULL,
   `appointment_id` int(11) DEFAULT NULL,
   `office_remarks` text DEFAULT NULL,
+  `cancellation_reason` varchar(500) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

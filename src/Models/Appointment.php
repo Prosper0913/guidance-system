@@ -112,8 +112,13 @@ class Appointment
      * held separately, so the original slot is preserved until the student responds via
      * confirmReschedule() or rejectReschedule(). Can be called again while still pending, so a
      * counselor can correct their own proposal before the student acts on it.
+     *
+     * $comment is an optional plain-text explanation from the counselor, shown to the student
+     * with the proposal. It replaces any comment from an earlier proposal (a new proposal with
+     * no comment clears the old one) and is kept after the student confirms, so they can still
+     * see why the appointment moved.
      */
-    public static function proposeReschedule(int $id, string $newDate, string $newTime, int $changedBy, ?string $remarks = null): array
+    public static function proposeReschedule(int $id, string $newDate, string $newTime, int $changedBy, ?string $remarks = null, ?string $comment = null): array
     {
         $db = Database::getConnection();
         $db->beginTransaction();
@@ -137,11 +142,14 @@ class Appointment
                 throw new RuntimeException('That time is already booked by another approved appointment.');
             }
 
+            $comment = $comment !== null ? mb_substr(trim($comment), 0, 500) : '';
             $upd = $db->prepare(
-                "UPDATE appointments SET status = 'rescheduled', proposed_date = ?, proposed_time = ?, rescheduled_at = NOW() WHERE id = ?"
+                "UPDATE appointments SET status = 'rescheduled', proposed_date = ?, proposed_time = ?, rescheduled_at = NOW(),
+                 reschedule_comment = ? WHERE id = ?"
             );
-            $upd->execute([$newDate, $newTime, $id]);
+            $upd->execute([$newDate, $newTime, $comment !== '' ? $comment : null, $id]);
 
+            // (the comment lives in appointments.reschedule_comment — it won't fit in the 255-char log remark)
             $note = $remarks ?: "Proposed moving from {$appt['appointment_date']} {$appt['appointment_time']} to {$newDate} {$newTime}; awaiting student confirmation.";
             $log = $db->prepare(
                 'INSERT INTO appointment_logs (appointment_id, old_status, new_status, changed_by, remarks)

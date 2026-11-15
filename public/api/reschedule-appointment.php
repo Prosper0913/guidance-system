@@ -23,6 +23,7 @@ if (!Csrf::validate($_POST['csrf_token'] ?? null)) {
 $id = (int)($_POST['appointment_id'] ?? 0);
 $newDate = $_POST['new_date'] ?? '';
 $newTime = $_POST['new_time'] ?? '';
+$comment = mb_substr(trim($_POST['comment'] ?? ''), 0, 500); // optional, shown to the student
 
 if (!$id || !$newDate || !$newTime) {
     echo json_encode(['success' => false, 'message' => 'Please pick a date and time.']);
@@ -45,7 +46,7 @@ try {
     // The student must confirm it from their My Appointments page before it
     // takes effect; declining (or not responding) cancels the appointment
     // instead of quietly keeping the old time.
-    $updated = Appointment::proposeReschedule($id, $newDate, $newTime, $user['id']);
+    $updated = Appointment::proposeReschedule($id, $newDate, $newTime, $user['id'], null, $comment);
 } catch (RuntimeException $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     exit;
@@ -53,7 +54,8 @@ try {
 
 Notification::create(
     (int)$updated['student_id'],
-    "Your counselor proposed moving your appointment to {$newDate} at " . date('g:i A', strtotime($newTime)) . '. Please confirm or decline it in My Appointments — if you don\'t respond, this appointment will be cancelled.',
+    "Your counselor proposed moving your appointment to {$newDate} at " . date('g:i A', strtotime($newTime)) . '. Please confirm or decline it in My Appointments — if you don\'t respond, this appointment will be cancelled.'
+    . ($comment !== '' ? " Comment from your counselor: {$comment}" : ''),
     $id
 );
 
