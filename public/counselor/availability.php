@@ -109,7 +109,7 @@ include __DIR__ . '/../partials/flash.php';
 <div class="row">
   <div class="col-md-6 mb-4">
     <div class="card">
-      <div class="card-header">Weekly Schedule <small class="text-muted fw-normal">(12:00–1:00 PM lunch break is automatically excluded)</small></div>
+      <div class="card-header">Weekly Schedule <small style="color: var(--brand-green-light);">(12:00–1:00 PM lunch break is automatically excluded)</small></div>
       <div class="card-body">
         <div class="table-responsive">
         <table class="table table-sm">
