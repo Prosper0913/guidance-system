@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../public/partials/push_to_cms.php';
 class Referral
 {
     /**
@@ -154,21 +153,6 @@ class Referral
         $referralNo = 'REF-' . date('Y') . '-' . str_pad((string)$id, 4, '0', STR_PAD_LEFT);
         $upd = $db->prepare('UPDATE referrals SET referral_no = ? WHERE id = ?');
         $upd->execute([$referralNo, $id]);
-
-        // ── Push referral flag to CMS ──
-        // New referral created with status='pending' (active). Push the
-        // flag so CMS knows this student has an active referral.
-        // Try student_id_number first; if empty, look up from student_id.
-        $id_number = $data['student_id_number'] ?? '';
-        if (!$id_number && !empty($data['student_id'])) {
-            $lu = $db->prepare('SELECT id_number FROM users WHERE id = ? LIMIT 1');
-            $lu->execute([$data['student_id']]);
-            $u = $lu->fetch(\PDO::FETCH_ASSOC);
-            $id_number = $u ? $u['id_number'] : '';
-        }
-        if ($id_number) {
-            push_referral_flag_to_cms($id_number);
-        }
 
         return $id;
     }
@@ -332,36 +316,18 @@ class Referral
     }
 
     // Link a referral to a registered student account (found via ID number or name search)
-    public static function linkStudent(int $referralId, int $studentId): void
-    {
-        $db = Database::getConnection();
+public static function linkStudent(int $referralId, int $studentId): void
+{
+    $db = Database::getConnection();
 
-        // Fetch the previous student_id BEFORE updating, so we can
-        // re-compute their flag after (in case this was their only referral).
-        $prev = $db->prepare('SELECT student_id FROM referrals WHERE id = ?');
-        $prev->execute([$referralId]);
-        $prevRow = $prev->fetch(\PDO::FETCH_ASSOC);
-        $prevStudentId = $prevRow ? (int)$prevRow['student_id'] : 0;
+    $lu = $db->prepare('SELECT id_number FROM users WHERE id = ? LIMIT 1');
+    $lu->execute([$studentId]);
+    $u = $lu->fetch(\PDO::FETCH_ASSOC);
+    $idNumber = $u ? $u['id_number'] : null;
 
-        // Look up the student's id_number (maps to CMS students.student_id)
-        $lu = $db->prepare('SELECT id_number FROM users WHERE id = ? LIMIT 1');
-        $lu->execute([$studentId]);
-        $u = $lu->fetch(\PDO::FETCH_ASSOC);
-        $idNumber = $u ? $u['id_number'] : null;
-
-        // Update the link AND sync student_id_number (so future
-        // push_referral_flag_to_cms calls can find this referral)
-        $stmt = $db->prepare('UPDATE referrals SET student_id = ?, student_id_number = ? WHERE id = ?');
-        $stmt->execute([$studentId, $idNumber, $referralId]);
-
-        // Push referral flag for the new student
-        push_referral_flag_to_cms_by_user_id($studentId);
-
-        // If there was a previous different student, re-compute their flag
-        if ($prevStudentId > 0 && $prevStudentId !== $studentId) {
-            push_referral_flag_to_cms_by_user_id($prevStudentId);
-        }
-    }
+    $stmt = $db->prepare('UPDATE referrals SET student_id = ?, student_id_number = ? WHERE id = ?');
+    $stmt->execute([$studentId, $idNumber, $referralId]);
+}
 
     // Section VIII — Guidance Office processing
     // Optional comment a counselor leaves when cancelling a referral; shown to the student.
@@ -396,24 +362,6 @@ class Referral
             'id' => $referralId,
         ]);
 
-        // ── Push referral flag to CMS ──
-        // The status change may have activated or deactivated the flag.
-        // Look up the student's id_number (try referrals.student_id_number
-        // first, then fall back to users.id_number via student_id).
-        $lu = $db->prepare(
-            'SELECT r.student_id_number, u.id_number AS user_id_number
-             FROM referrals r
-             LEFT JOIN users u ON u.id = r.student_id
-             WHERE r.id = ?'
-        );
-        $lu->execute([$referralId]);
-        $r = $lu->fetch(\PDO::FETCH_ASSOC);
-        if ($r) {
-            $id_number = $r['student_id_number'] ?: $r['user_id_number'];
-            if ($id_number) {
-                push_referral_flag_to_cms($id_number);
-            }
-        }
     }
 
     public static function linkAppointment(int $referralId, int $appointmentId): void
